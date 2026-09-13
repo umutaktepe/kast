@@ -49,6 +49,17 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 *Bu script sanal ortamı kurar, bağımlılıkları yükler, `%USERPROFILE%\bin\kast.cmd` başlatıcısını oluşturur ve Kullanıcı `PATH` ortam değişkenine otomatik ekler. Artık CMD veya PowerShell'de sadece `kast` yazmanız yeterlidir.*
 
+### 🗑️ Programı Kaldırma (Uninstall)
+- **Linux:**
+  ```bash
+  ./uninstall.sh
+  ```
+- **Windows:**
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
+  ```
+*Bu işlem terminal başlatıcısını sisteminizden temizler. Ardından klasörü silebilirsiniz.*
+
 ---
 
 ## 💻 Kullanım Şekilleri
