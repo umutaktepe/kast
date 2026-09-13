@@ -1,123 +1,204 @@
-import re
+"""Dublaj Çevirisi Kast Çıkarma Sistemi (Kast 2.0).
+
+CLI ve kütüphane arayüzü: Dublaj DOCX senaryolarını okuyarak kast tablosunu
+otomatik oluşturur ve Word dökümanına ekler veya ayrı dosya olarak kaydeder.
+"""
+
+import argparse
+import os
 import sys
-import pandas as pd
-from collections import defaultdict
-import pdfplumber
+from collections import OrderedDict
+from typing import List, Optional
+
 from docx import Document
-from docx.shared import Pt
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
 
-def extract_cast_from_pdf(pdf_path):
-    # Karakterlerin adlarını, replik sayısını ve geçtiği sayfaları tutmak için sözlük
-    character_data = defaultdict(lambda: {"count": 0, "pages": set()})
+from src.models import CastExtractionResult, CharacterStats
+from src.paginator import DocumentPaginator
+from src.parser import DubbingDocxParser
+from src.table_writer import CastTableWriter
 
-    with pdfplumber.open(pdf_path) as pdf:
-        for page_number, page in enumerate(pdf.pages, start=1):
-            text = page.extract_text()
-            if not text:
-                print(f"Sayfa {page_number} boş veya metin çıkarılamadı.")
-                continue
 
-            # Geçersiz başlıkları ve süre bilgilerini hariç tutan regex
-            filtered_lines = [
-                line for line in text.splitlines()
-                if not re.match(r"^(F\u0130LM ADI|\u00c7EV\u0130REN|\d{2}\.\d{2})", line)
-            ]
+def process_cast_document(
+    docx_path: str,
+    output_path: Optional[str] = None,
+    pdf_path: Optional[str] = None,
+    sort_by: str = "appearance",
+    standalone: bool = False,
+) -> str:
+    """Process a dubbing DOCX script, extract cast statistics, and output cast table.
 
-            # Karakter adı ve replikleri tespit etmek için regex (noktalama ve boşluk içeren tam isimleri almak için güncellendi)
-            matches = re.findall(r"^([A-Z\u00c7\u011e\u0130\u00d6\u015e\u00dc][A-Z\u00c7\u011e\u0130\u00d6\u015e\u00dc0-9\s\.\-]*)\s*-\s+", "\n".join(filtered_lines), re.MULTILINE)
+    Args:
+        docx_path: Path to the input dubbing script .docx file.
+        output_path: Optional destination .docx path. If None, saves as <basename>_kast.docx.
+        pdf_path: Optional reference PDF path for page number detection.
+        sort_by: Character sorting mode ('appearance', 'count', or 'name').
+        standalone: If True, outputs a standalone document with only the cast table.
+                    If False (default), appends the cast table to the script document.
 
-            if not matches:
-                print(f"Sayfa {page_number} için eşleşme bulunamadı.")
-                continue
+    Returns:
+        The output file path.
+    """
+    if not os.path.exists(docx_path):
+        raise FileNotFoundError(f"Dosya bulunamadı: {docx_path}")
 
-            for character in matches:
-                character = character.strip().rstrip("-")  # Gereksiz tire işaretlerini kaldır
-                character_data[character]["count"] += 1
-                character_data[character]["pages"].add(page_number)
+    print(f"[*] Döküman yükleniyor: {docx_path}")
+    doc = Document(docx_path)
 
-    # Sonuçları tabloya dönüştürme
-    data = []
-    for character, info in character_data.items():
-        data.append({
-            "Karakter": character,
-            "Replik Sayısı": info["count"],
-            "Repliklerin Geçtiği Sayfalar": ", ".join(map(str, sorted(info["pages"]))),
-            "Notlar": ""
-        })
+    # 1. Paragrafları ayrıştır (Diyalog, Süre Kodu, Metadata)
+    parser = DubbingDocxParser()
+    parsed_paras = parser.parse_document_paragraphs(doc)
 
-    if not data:
-        print("PDF'den hiçbir veri çıkarılamadı. PDF yapısını kontrol edin.")
+    dialogue_paras = [p for p in parsed_paras if p.speaker and p.dialogue]
+    print(f"[+] Toplam {len(parsed_paras)} paragraf incelendi.")
+    print(f"[+] {len(dialogue_paras)} replik tespit edildi.")
+
+    # 2. Sayfa numaralandırmasını hesapla
+    paginator = DocumentPaginator(doc)
+    assigned_paras = paginator.process(parsed_paras, pdf_path=pdf_path)
+
+    # 3. Karakter istatistiklerini derle
+    characters_map: OrderedDict[str, CharacterStats] = OrderedDict()
+    appearance_counter = 0
+
+    for p in assigned_paras:
+        if not p.speaker or not p.dialogue:
+            continue
+        if p.speaker not in characters_map:
+            appearance_counter += 1
+            characters_map[p.speaker] = CharacterStats(
+                name=p.speaker,
+                first_seen_order=appearance_counter,
+            )
+        characters_map[p.speaker].add_line(page=p.page or 1)
+
+    char_list = list(characters_map.values())
+    if sort_by == "count":
+        char_list.sort(key=lambda x: x.line_count, reverse=True)
+    elif sort_by == "name":
+        char_list.sort(key=lambda x: x.name)
+    else:  # appearance
+        char_list.sort(key=lambda x: x.first_seen_order)
+
+    print(f"[+] {len(char_list)} farklı karakter tespit edildi.")
+
+    result = CastExtractionResult(
+        characters=char_list,
+        total_lines=len(dialogue_paras),
+        total_pages=max((p.page for p in assigned_paras if p.page), default=1),
+    )
+
+    # 4. Kast tablosunu dökümana ekle
+    writer = CastTableWriter()
+    if standalone:
+        target_doc = Document()
+        writer.append_cast_table(target_doc, result, add_page_break=False)
+        save_doc = target_doc
     else:
-        print(f"Çıkarılan veriler: {data}")
+        writer.append_cast_table(doc, result, add_page_break=True)
+        save_doc = doc
 
-    df = pd.DataFrame(data)
-    return df
+    # 5. Kaydet
+    if not output_path:
+        base, ext = os.path.splitext(docx_path)
+        output_path = f"{base}_kast{ext}"
 
-def set_table_borders(table):
-    # Tabloya kenarlık ekler
-    tbl = table._element
-    for cell in tbl.xpath(".//w:tc"):  # Her hücre için
-        tc_pr = cell.xpath(".//w:tcPr")[0]
-        borders = OxmlElement("w:tcBorders")
-        for border_name in ["top", "left", "bottom", "right"]:
-            border = OxmlElement(f"w:{border_name}")
-            border.set(qn("w:val"), "single")
-            border.set(qn("w:sz"), "4")  # Kalınlık
-            border.set(qn("w:space"), "0")
-            border.set(qn("w:color"), "000000")
-            borders.append(border)
-        tc_pr.append(borders)
+    save_doc.save(output_path)
+    print(f"[✓] Başarıyla tamamlandı! Kast tablosu kaydedildi:")
+    print(f"    -> {output_path}")
+    return output_path
 
-def save_to_docx(df, output_path):
-    document = Document()
 
-    table = document.add_table(rows=1, cols=4)
-    table.style = "Table Grid"
+def build_cli_parser() -> argparse.ArgumentParser:
+    """Build command line argument parser for Kast CLI."""
+    parser = argparse.ArgumentParser(
+        description="DUBLAJ ÇEVİRİSİ KAST ÇIKARMA PROGRAMI (Kast 2.0)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "docx_file",
+        nargs="?",
+        default=None,
+        help="İşlenecek dublaj DOCX dosyasının yolu.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        dest="output_path",
+        default=None,
+        help="Çıktı DOCX dosya yolu (varsayılan: <dosya>_kast.docx).",
+    )
+    parser.add_argument(
+        "--sort",
+        dest="sort_by",
+        choices=["appearance", "count", "name"],
+        default="appearance",
+        help="Karakter sıralama türü: appearance (varsayılan), count veya name.",
+    )
+    parser.add_argument(
+        "--in-place",
+        dest="in_place",
+        action="store_true",
+        help="Tabloyu orijinal dökümanın üzerine kaydet.",
+    )
+    parser.add_argument(
+        "--pdf",
+        dest="pdf_path",
+        default=None,
+        help="Sayfa tespiti için opsiyonel referans PDF dosyası yolu.",
+    )
+    parser.add_argument(
+        "--standalone",
+        dest="standalone",
+        action="store_true",
+        help="Kast tablosunu orijinal metin olmadan ayrı bir DOCX olarak kaydet.",
+    )
+    return parser
 
-    # Başlık satırı
-    hdr_cells = table.rows[0].cells
-    hdr_cells[0].text = "Karakter"
-    hdr_cells[1].text = "Replik Sayısı"
-    hdr_cells[2].text = "Repliklerin Geçtiği Sayfalar"
-    hdr_cells[3].text = "Notlar"
 
-    for cell in hdr_cells:
-        cell.paragraphs[0].runs[0].font.bold = True
-        cell.paragraphs[0].runs[0].font.size = Pt(12)  # Yazı boyutunu büyüt
+def main(argv: Optional[List[str]] = None) -> int:
+    """CLI and interactive entry point."""
+    parser = build_cli_parser()
+    args = parser.parse_args(argv)
 
-    # Verileri doldurma
-    for _, row in df.iterrows():
-        row_cells = table.add_row().cells
-        row_cells[0].text = row["Karakter"]
-        row_cells[1].text = str(row["Replik Sayısı"])
-        row_cells[2].text = row["Repliklerin Geçtiği Sayfalar"]
-        row_cells[3].text = row["Notlar"]
+    print("=" * 60)
+    print(" DUBLAJ ÇEVİRİSİ KAST ÇIKARMA PROGRAMI (Kast 2.0)")
+    print("=" * 60)
 
-    set_table_borders(table)  # Kenarlıkları ayarla
-    document.save(output_path)
-    print(f"Sonuçlar {output_path} dosyasına kaydedildi.")
+    docx_file = args.docx_file
+    if not docx_file:
+        raw_input = input("Lütfen çeviri DOCX dosyasını buraya sürükleyip bırakın ve Enter'a basın:\n> ")
+        docx_file = raw_input.strip("'\"")
+
+    if not docx_file:
+        print("Hata: Dosya belirtilmedi.")
+        return 1
+
+    docx_file = docx_file.strip("'\"")
+
+    if args.in_place and args.standalone:
+        print("Hata: --in-place ve --standalone seçenekleri birlikte kullanılamaz.")
+        return 1
+
+    output_path = args.output_path
+    if args.in_place:
+        output_path = docx_file
+
+    try:
+        process_cast_document(
+            docx_path=docx_file,
+            output_path=output_path,
+            pdf_path=args.pdf_path,
+            sort_by=args.sort_by,
+            standalone=args.standalone,
+        )
+        return 0
+    except Exception as e:
+        print(f"\n[!] Bir hata oluştu: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return 1
+
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Lütfen kast için PDF dosyasının yolunu terminale sürükleyip bırakın.")
-        input_file = input("Dosya yolunu buraya yapıştırın: ").strip()
-    else:
-        input_file = sys.argv[1].strip("'\"")  # Tırnak işaretlerini temizle
-
-    # Dosya yolundaki fazladan tırnak işaretlerini temizle
-    if input_file.startswith("'") and input_file.endswith("'"):
-        input_file = input_file[1:-1]
-    elif input_file.startswith('"') and input_file.endswith('"'):
-        input_file = input_file[1:-1]
-
-    docx_output_path = "kast.docx"  # Çıktı DOCX dosyasının adı
-
-    df = extract_cast_from_pdf(input_file)
-
-    # Sonuçları DOCX dosyasına kaydetme
-    if not df.empty:
-        save_to_docx(df, docx_output_path)
-    else:
-        print("Hiçbir veri bulunamadı. PDF yapısını kontrol edin.")
+    sys.exit(main())

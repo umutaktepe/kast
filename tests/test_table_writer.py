@@ -218,3 +218,19 @@ def test_save_result_and_standalone_functions(tmp_path):
     reloaded_doc = Document(out_file)
     assert len(reloaded_doc.tables) == 1
     assert reloaded_doc.tables[0].rows[1].cells[0].text == "POBY"
+
+
+def test_append_cast_table_without_page_break():
+    """Verify appending table without inserting a page break."""
+    doc = Document()
+    char1 = CharacterStats(name="POBY", first_seen_order=1)
+    result = CastExtractionResult(characters=[char1], total_lines=1, total_pages=1)
+
+    writer = CastTableWriter()
+    writer.append_cast_table(doc, result, add_page_break=False)
+
+    # If add_page_break is False, no page break paragraph was added
+    assert len(doc.paragraphs) == 1  # Only the table heading paragraph
+    assert doc.paragraphs[0].text == "KAST TABLOSU"
+    assert len(doc.tables) == 1
+

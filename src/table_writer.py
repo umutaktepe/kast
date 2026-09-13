@@ -3,8 +3,6 @@
 Generates and formats the 4-column cast table and appends it directly to
 a Word (.docx) document with proper styling, borders, and column widths.
 """
-
-from typing import Optional
 from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
