@@ -125,6 +125,26 @@ def test_document_paginator_with_doc_dimensions():
     assert paginator.layout_paginator.printable_height == 300
 
 
+def test_document_paginator_with_missing_section_margins():
+    """Test DocumentPaginator safely handles sections where margin attributes are None."""
+    mock_doc = MagicMock()
+    mock_sec = MagicMock()
+    # Simulate missing w:pgMar where python-docx returns None
+    mock_sec.page_height = None
+    mock_sec.page_width = None
+    mock_sec.top_margin = None
+    mock_sec.bottom_margin = None
+    mock_sec.left_margin = None
+    mock_sec.right_margin = None
+    mock_doc.sections = [mock_sec]
+
+    paginator = DocumentPaginator(mock_doc)
+    # Defaults should be applied: 792 - 72 - 72 = 648
+    assert paginator.layout_paginator.printable_height == 648
+    assert paginator.layout_paginator.printable_width == 468
+
+
+
 def test_document_paginator_with_xml_hard_page_break():
     """Test DocumentPaginator detection of XML hard page breaks."""
     doc = Document()

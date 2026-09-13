@@ -158,13 +158,44 @@ class DocumentPaginator:
         self.doc = doc
         if doc and hasattr(doc, "sections") and len(doc.sections) > 0:
             sec = doc.sections[0]
+            page_height = (
+                getattr(sec.page_height, "pt", 792.0)
+                if getattr(sec, "page_height", None) is not None
+                else 792.0
+            )
+            page_width = (
+                getattr(sec.page_width, "pt", 612.0)
+                if getattr(sec, "page_width", None) is not None
+                else 612.0
+            )
+            top_margin = (
+                getattr(sec.top_margin, "pt", 72.0)
+                if getattr(sec, "top_margin", None) is not None
+                else 72.0
+            )
+            bottom_margin = (
+                getattr(sec.bottom_margin, "pt", 72.0)
+                if getattr(sec, "bottom_margin", None) is not None
+                else 72.0
+            )
+            left_margin = (
+                getattr(sec.left_margin, "pt", 72.0)
+                if getattr(sec, "left_margin", None) is not None
+                else 72.0
+            )
+            right_margin = (
+                getattr(sec.right_margin, "pt", 72.0)
+                if getattr(sec, "right_margin", None) is not None
+                else 72.0
+            )
+
             self.layout_paginator = PurePythonLayoutPaginator(
-                page_height_pt=sec.page_height.pt,
-                page_width_pt=sec.page_width.pt,
-                top_margin_pt=sec.top_margin.pt,
-                bottom_margin_pt=sec.bottom_margin.pt,
-                left_margin_pt=sec.left_margin.pt,
-                right_margin_pt=sec.right_margin.pt,
+                page_height_pt=page_height,
+                page_width_pt=page_width,
+                top_margin_pt=top_margin,
+                bottom_margin_pt=bottom_margin,
+                left_margin_pt=left_margin,
+                right_margin_pt=right_margin,
             )
         else:
             self.layout_paginator = PurePythonLayoutPaginator()
@@ -232,16 +263,9 @@ class DocumentPaginator:
                 ".//w:lastRenderedPageBreak | .//w:r/w:br[@w:type='page']"
             )
             if break_elements:
-                if not doc_p.text.strip():
-                    # Yalnızca sayfa sonu içeren boş paragraf
-                    current_page += len(break_elements)
-                    para_pages[doc_idx] = current_page
-                else:
-                    # Metin içeren paragraf içinde sayfa sonu
-                    current_page += len(break_elements)
-                    para_pages[doc_idx] = current_page
-            else:
-                para_pages[doc_idx] = current_page
+                current_page += len(break_elements)
+
+            para_pages[doc_idx] = current_page
 
         for p in paragraphs:
             if p.index in para_pages:
