@@ -99,17 +99,6 @@ def test_header_bolding_and_styling():
 
     writer.append_cast_table(doc, result)
 
-    # Heading paragraph check
-    heading_p = None
-    for p in doc.paragraphs:
-        if "KAST TABLOSU" in p.text:
-            heading_p = p
-            break
-    assert heading_p is not None, "KAST TABLOSU title paragraph not found"
-    assert heading_p.runs[0].bold is True
-    assert heading_p.runs[0].font.size == Pt(14)
-    assert heading_p.runs[0].font.name == "Arial"
-
     # Header row formatting
     table = doc.tables[0]
     # Header should not repeat across pages (w:tblHeader should be absent)
@@ -240,9 +229,8 @@ def test_append_cast_table_without_page_break():
     writer = CastTableWriter()
     writer.append_cast_table(doc, result, add_page_break=False)
 
-    # If add_page_break is False, no page break paragraph was added
-    assert len(doc.paragraphs) == 1  # Only the table heading paragraph
-    assert doc.paragraphs[0].text == "KAST TABLOSU"
+    # If add_page_break is False, no page break and no extra paragraphs are added
+    assert len(doc.paragraphs) == 0
     assert len(doc.tables) == 1
 
 

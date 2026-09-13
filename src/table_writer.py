@@ -222,25 +222,11 @@ class CastTableWriter:
         font_name = self.font_name or detected_font or "Arial"
         item_size_pt = self.font_size_pt or detected_size or 10.0
         header_size_pt = self.font_size_pt or detected_size or 11.0
-        heading_size_pt = max(14.0, item_size_pt + 3.0)
-
         # 1. Metnin sonuna yeni sayfa kesmesi ekle
         if add_page_break:
             doc.add_page_break()
 
-        # 2. Tablo başlığı
-        p = doc.add_paragraph()
-        p.paragraph_format.space_before = Pt(0)
-        p.paragraph_format.space_after = Pt(12)
-        p.paragraph_format.left_indent = Inches(0)
-        p.paragraph_format.right_indent = Inches(0)
-        p.paragraph_format.first_line_indent = Inches(0)
-        run = p.add_run("KAST TABLOSU")
-        run.bold = True
-        run.font.size = Pt(heading_size_pt)
-        run.font.name = font_name
-
-        # 3. 4 sütunlu tablo oluştur
+        # 2. 4 sütunlu tablo oluştur
         table = doc.add_table(rows=1, cols=4)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         table.autofit = False
