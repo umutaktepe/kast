@@ -185,3 +185,24 @@ def test_select_file_dialog_cancelled(monkeypatch):
     # Must only call zenity once, and NOT cascade to kdialog or tkinter!
     assert call_count == 1
 
+
+@pytest.mark.asyncio
+async def test_tui_sort_radio_options_visible():
+    """Verify all 3 sorting options (including sort-name) are fully visible and not clipped."""
+    app = KastApp()
+    async with app.run_test(size=(100, 24)) as pilot:
+        col = app.query_one(".options-col")
+        b1 = app.query_one("#sort-appearance")
+        b2 = app.query_one("#sort-count")
+        b3 = app.query_one("#sort-name")
+
+        # All 3 widgets exist and are RadioButtons
+        assert b1 is not None
+        assert b2 is not None
+        assert b3 is not None
+
+        # Verify b3 (sort-name) is strictly above the bottom border of options-col
+        col_bottom_y = col.region.y + col.region.height - 1
+        assert b3.region.y < col_bottom_y
+
+

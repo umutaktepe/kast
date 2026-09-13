@@ -225,7 +225,7 @@ Screen {
 }
 
 #options-row {
-    height: 5;
+    height: 6;
     margin-top: 1;
     margin-bottom: 0;
 }
