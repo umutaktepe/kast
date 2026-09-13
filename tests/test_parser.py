@@ -13,6 +13,17 @@ def test_detect_metadata_vs_dialogue():
     assert key == "FİLMİN ADI"
     assert val == "ANOTHER END"
 
+    # Case-insensitive header örneği
+    is_meta, key, val = parser.parse_header_line("Filmin Adı\tANOTHER END")
+    assert is_meta is True
+    assert key == "Filmin Adı"
+    assert val == "ANOTHER END"
+
+    is_meta, key, val = parser.parse_header_line("filmin adı\tANOTHER END")
+    assert is_meta is True
+    assert key == "filmin adı"
+    assert val == "ANOTHER END"
+
     # Diyalog örneği (sekme ve ardından tire ile başlayan satır)
     is_dial, char, text = parser.parse_dialogue_line("SAL\t- Hallettim.")
     assert is_dial is True
@@ -30,7 +41,9 @@ def test_timecode_detection():
     assert parser.is_timecode("MC COOKIE") is False
     assert parser.is_timecode("") is False
     assert parser.is_timecode("123") is False
-    assert parser.is_timecode("01:23:45:67") is False
+    assert parser.is_timecode("01:23:45:67") is True
+    assert parser.is_timecode("01.23.45.67") is True
+    assert parser.is_timecode("01:23:45:67:89") is False
 
 
 def test_parse_header_line_edge_cases():

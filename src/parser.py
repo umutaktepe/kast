@@ -26,7 +26,12 @@ KNOWN_METADATA_KEYS: Set[str] = {
     "TRANSLATOR",
 }
 
-TIMECODE_REGEX = re.compile(r"^\d{2}[\.:]\d{2}(?:[\.:]\d{2})?$")
+TIMECODE_REGEX = re.compile(r"^\d{2}[\.:]\d{2}(?:[\.:]\d{2}(?:[\.:]\d{2})?)?$")
+
+
+def turkish_upper(text: str) -> str:
+    """Convert text to uppercase with Turkish character handling (i -> İ, ı -> I)."""
+    return text.translate({ord("i"): "İ", ord("ı"): "I"}).upper()
 
 
 @dataclass
@@ -66,7 +71,7 @@ class DubbingDocxParser:
         )
 
     def is_timecode(self, text: str) -> bool:
-        """Check if paragraph text represents a timecode (e.g. 00.41, 01.59, 01.00.06)."""
+        """Check if paragraph text represents a timecode (e.g. 00.41, 01.59, 01.00.06, 01:23:45:67)."""
         cleaned = text.strip()
         return bool(TIMECODE_REGEX.match(cleaned))
 
@@ -82,11 +87,31 @@ class DubbingDocxParser:
         parts = text_clean.split("\t", 1)
         if len(parts) == 2:
             key, val = parts[0].strip(), parts[1].strip()
-            if key in self.known_metadata_keys or any(key.startswith(k) for k in self.known_metadata_keys):
+            key_tr_upper = turkish_upper(key)
+            key_std_upper = key.upper()
+            key_variants = {
+                key,
+                key_std_upper,
+                key_tr_upper,
+                key_std_upper.replace("İ", "I"),
+                key_tr_upper.replace("İ", "I"),
+            }
+
+            known_upper = set()
+            for k in self.known_metadata_keys:
+                known_upper.add(k)
+                known_upper.add(k.upper())
+                known_upper.add(turkish_upper(k))
+                known_upper.add(k.replace("İ", "I").upper())
+
+            if any(kv in known_upper for kv in key_variants) or any(
+                any(kv.startswith(ku) for ku in known_upper) for kv in key_variants
+            ):
                 return True, key, val
-            if not val.startswith("-") and not val.startswith("–") and not val.startswith("—") and key.isupper() and len(key.split()) <= 4:
+
+            if not val.startswith("-") and not val.startswith("–") and not val.startswith("—") and len(key.split()) <= 4:
                 # Muhtemel başlık tanımlayıcısı
-                if any(m in key for m in ["AD", "ÇEVİR", "TARİH", "METİN", "PROJE", "KOD"]):
+                if any(m in key_tr_upper for m in ["AD", "ÇEVİR", "TARİH", "METİN", "PROJE", "KOD"]):
                     return True, key, val
         return False, None, None
 
