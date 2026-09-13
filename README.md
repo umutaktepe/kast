@@ -40,8 +40,8 @@ Geleneksel kast çıkarma araçları veya manuel yöntemlere kıyasla Kast 2.0 �
 
 1. Depoyu klonlayın veya indirin:
    ```bash
-   git clone https://github.com/kullanici/Kast.git
-   cd Kast
+   git clone https://github.com/umutaktepe/kast.git
+   cd kast
    ```
 
 2. Sanal ortam (virtualenv) oluşturun ve etkinleştirin:
@@ -178,8 +178,8 @@ kast.py (CLI & Orkestrasyon)
 3. **Saf Python Mizanpaj Motoru (`LayoutPaginator`):** Harici bir ofis paketi (Word, LibreOffice) bulunmayan ortamlarda dökümanın sayfa boyutlarını, kenar boşluklarını (margins), Arial/Verdana yazı tipi metriklerini, satır aralıklarını (1.5 satır katsayısı) ve Pillow font genişliklerini kullanarak satır sarma (word-wrap) ve sayfa taşma simülasyonunu %98+ doğrulukla gerçekleştirir.
 
 ### 3. `src/table_writer.py` (CastTableWriter)
-- Belgenin sonuna `w:pageBreak` ekleyerek yeni bir sayfa açar.
-- **Yazı Tipi ve Boyutu Uyumu (`detect_document_font`):** Dökümanın paragraflarından, stillerinden veya varsayılanlarından kullanılan ana fontu (örneğin `Verdana`) ve boyutunu (örneğin `11pt`) otomatik tespit eder. Tablo öğelerini, başlıklarını ve başlık metnini bu font ailesi ve boyutuna tam uyumlu olarak üretir.
+- Belgenin sonuna `w:pageBreak` ekleyerek yeni bir sayfa açar ve doğrudan tablo ile başlar.
+- **Yazı Tipi ve Boyutu Uyumu (`detect_document_font`):** Dökümanın paragraflarından, stillerinden veya varsayılanlarından kullanılan ana fontu (örneğin `Verdana`) ve boyutunu (örneğin `11pt`) otomatik tespit eder. Tablo öğelerini ve sütun başlıklarını bu font ailesi ve boyutuna tam uyumlu olarak üretir.
 - **Hücre İçi Dikey Ortalama:** Tüm tablo hücreleri dikey olarak ortalanmıştır (`w:vAlign w:val="center"`).
 - **Sayfa Düzeni ve Kenarlıklar:** Başlık satırı yalnızca tablonun başında yer alır, satırların sayfa geçişinde bölünmesi engellenmiştir (`w:cantSplit`). OpenXML düzeyinde `w:tcBorders` (Table Grid) etiketleri ile Word/OnlyOffice uyumu sağlanır.
 
