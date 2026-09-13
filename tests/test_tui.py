@@ -101,3 +101,64 @@ async def test_tui_successful_extraction(tmp_path):
         assert len(out_doc.tables) == 1
         table = out_doc.tables[0]
         assert len(table.rows) == 3  # Header + ALICE + BOB
+
+
+def test_clean_drag_drop_path():
+    """Verify clean_drag_drop_path handles various terminal drag & drop formats."""
+    from src.tui import clean_drag_drop_path
+
+    # Standard path with quotes
+    assert clean_drag_drop_path("'/home/user/film.docx'") == "/home/user/film.docx"
+    assert clean_drag_drop_path('"/home/user/film.docx"') == "/home/user/film.docx"
+
+    # file:// URI scheme
+    assert clean_drag_drop_path("file:///home/user/film.docx") == "/home/user/film.docx"
+    assert clean_drag_drop_path("'file:///home/user/film.docx'") == "/home/user/film.docx"
+
+    # URL percent-encoding (spaces and non-ASCII)
+    assert clean_drag_drop_path("file:///home/user/My%20Script.docx") == "/home/user/My Script.docx"
+    assert clean_drag_drop_path("file:///home/user/T%C3%BCrk%C3%A7e.docx") == "/home/user/Türkçe.docx"
+
+    # Whitespace and newlines
+    assert clean_drag_drop_path("  /home/user/film.docx\r\n\t  ") == "/home/user/film.docx"
+    assert clean_drag_drop_path("") == ""
+
+
+@pytest.mark.asyncio
+async def test_tui_drag_drop_paste_events():
+    """Verify KastApp handles app-level drag-and-drop paste events."""
+    from textual import events
+
+    app = KastApp()
+    async with app.run_test() as pilot:
+        # 1. Drop a DOCX anywhere in the app
+        pilot.app.post_message(events.Paste(text="file:///home/user/test%20drop.docx"))
+        await pilot.pause()
+        docx_val = app.query_one("#docx-path").value
+        assert docx_val == "/home/user/test drop.docx"
+
+        # 2. Drop a PDF anywhere in the app
+        pilot.app.post_message(events.Paste(text="'file:///home/user/ref.pdf'"))
+        await pilot.pause()
+        pdf_val = app.query_one("#pdf-path").value
+        assert pdf_val == "/home/user/ref.pdf"
+        # docx-path must remain unchanged
+        assert app.query_one("#docx-path").value == "/home/user/test drop.docx"
+
+
+@pytest.mark.asyncio
+async def test_tui_input_routing_swap():
+    """Verify smart swap if user pastes PDF into DOCX input or vice versa."""
+    app = KastApp()
+    async with app.run_test() as pilot:
+        docx_inp = app.query_one("#docx-path")
+        pdf_inp = app.query_one("#pdf-path")
+
+        # Paste PDF into DOCX input
+        docx_inp.value = "file:///home/user/wrong_box.pdf"
+        await pilot.pause()
+
+        # Should be automatically moved to pdf_inp and cleared from docx_inp
+        assert docx_inp.value == ""
+        assert pdf_inp.value == "/home/user/wrong_box.pdf"
+
