@@ -139,10 +139,10 @@ Oluşturulan tablo dökümanın sonuna yeni bir sayfada eklenir ve Microsoft Wor
 
 | Sütun Adı | Genişlik | Açıklama |
 | :--- | :---: | :--- |
-| **Karakter** | 1.8 inç | Senaryoda tespit edilen konuşmacı adı (Örn: `PORORO`, `MC COOKIE`). |
-| **Replik Sayısı** | 1.1 inç | Karakterin senaryodaki toplam replik adedi. |
+| **Karakter** | 2.0 inç | Senaryoda tespit edilen konuşmacı adı (Örn: `PORORO`, `MC COOKIE`). |
+| **Replik Sayısı** | 1.0 inç | Karakterin senaryodaki toplam replik adedi. |
 | **Repliklerin Geçtiği Sayfalar** | 2.3 inç | Karakterin repliklerinin bulunduğu sayfa numaraları (Örn: `1, 2, 5, 8`). |
-| **Notlar** | 1.3 inç | Dublaj yönetmeni / seslendirme teknisyeni için ayrılmış boş not alanı (Oyuncu seçimi, ses rengi vb.). |
+| **Notlar** | 1.2 inç | Dublaj yönetmeni / seslendirme teknisyeni için ayrılmış boş not alanı (Oyuncu seçimi, ses rengi vb.). |
 
 ---
 
@@ -159,8 +159,8 @@ kast.py (CLI & Orkestrasyon)
    ├──> src/paginator.py (DocumentPaginator & LayoutPaginator)
    │       └── XML sayfa kesmeleri, PDF eşleme ve saf Python mizanpaj simülatörü
    │
-   ├──> src/table_writer.py (CastTableWriter)
-   │       └── OpenXML w:tcBorders Table Grid, sayfa sonu, sütun genişliği ve Arial formatı
+   ├──> src/table_writer.py (CastTableWriter & detect_document_font)
+   │       └── OpenXML w:tcBorders Table Grid, dikey ortalama (vAlign), yazı tipi ve boyutu uyumu
    │
    └──> src/models.py
            └── DialogueLine, CharacterStats, CastExtractionResult
@@ -175,12 +175,13 @@ kast.py (CLI & Orkestrasyon)
 Üç aşamalı hibrit sayfa belirleme stratejisi uygular:
 1. **XML Sayfa Kesmeleri:** Döküman içindeki Word tarafından işlenmiş sayfa işaretçilerini (`w:lastRenderedPageBreak` veya `w:br[@w:type="page"]`) denetler.
 2. **PDF Entegrasyonu (Opsiyonel):** `--pdf` parametresi verilmişse `pdfplumber` ile PDF sayfalarını metin bazında tarayarak kesin sayfa ataması yapar.
-3. **Saf Python Mizanpaj Motoru (`LayoutPaginator`):** Harici bir ofis paketi (Word, LibreOffice) bulunmayan ortamlarda dökümanın sayfa boyutlarını, kenar boşluklarını (margins), Arial 11pt yazı tipi metriklerini, satır aralıklarını (1.5 satır katsayısı) ve Pillow font genişliklerini kullanarak satır sarma (word-wrap) ve sayfa taşma simülasyonunu %98+ doğrulukla gerçekleştirir.
+3. **Saf Python Mizanpaj Motoru (`LayoutPaginator`):** Harici bir ofis paketi (Word, LibreOffice) bulunmayan ortamlarda dökümanın sayfa boyutlarını, kenar boşluklarını (margins), Arial/Verdana yazı tipi metriklerini, satır aralıklarını (1.5 satır katsayısı) ve Pillow font genişliklerini kullanarak satır sarma (word-wrap) ve sayfa taşma simülasyonunu %98+ doğrulukla gerçekleştirir.
 
 ### 3. `src/table_writer.py` (CastTableWriter)
 - Belgenin sonuna `w:pageBreak` ekleyerek yeni bir sayfa açar.
-- 4 sütunlu tabloyu oluşturur; Word'ün varsayılan kenarlık kaybolma sorununu önlemek için OpenXML düzeyinde `w:tcBorders` (Table Grid) etiketlerini hücre bazında uygular.
-- Sütun genişliklerini sabitler ve başlıkları kalın (bold) Arial stiliyle biçimlendirir.
+- **Yazı Tipi ve Boyutu Uyumu (`detect_document_font`):** Dökümanın paragraflarından, stillerinden veya varsayılanlarından kullanılan ana fontu (örneğin `Verdana`) ve boyutunu (örneğin `11pt`) otomatik tespit eder. Tablo öğelerini, başlıklarını ve başlık metnini bu font ailesi ve boyutuna tam uyumlu olarak üretir.
+- **Hücre İçi Dikey Ortalama:** Tüm tablo hücreleri dikey olarak ortalanmıştır (`w:vAlign w:val="center"`).
+- **Sayfa Düzeni ve Kenarlıklar:** Başlık satırı yalnızca tablonun başında yer alır, satırların sayfa geçişinde bölünmesi engellenmiştir (`w:cantSplit`). OpenXML düzeyinde `w:tcBorders` (Table Grid) etiketleri ile Word/OnlyOffice uyumu sağlanır.
 
 ---
 
@@ -193,12 +194,13 @@ Proje kapsamlı bir test süitine (`pytest`) sahiptir:
 .venv/bin/pytest -v
 ```
 
-### Test Kapsamı (50/50 Başarılı Test):
+### Test Kapsamı (53/53 Başarılı Test):
 - `tests/test_models.py` — Veri modelleri, replik ekleme ve sayfa formatlama testleri.
 - `tests/test_parser.py` — Başlık tespiti, zaman kodu ayrıştırma ve karmaşık diyalog satırları.
 - `tests/test_paginator.py` — Çok katmanlı sayfa motoru, Pillow font simülasyonu, XML kesmeleri ve PDF referansı.
-- `tests/test_table_writer.py` — Tablo oluşturma, OpenXML kenarlıkları, sütun genişlikleri ve bağımsız belge modu.
+- `tests/test_table_writer.py` — Tablo oluşturma, OpenXML kenarlıkları, dikey ortalama, dinamik font tespiti, sütun genişlikleri ve bağımsız belge modu.
 - `tests/test_integration.py` — Uçtan uca boru hattı, CLI argümanları, tırnaklı sürükle-bırak yolu ve Pororo örnek döküman doğrulaması.
+
 
 ---
 
