@@ -115,8 +115,11 @@ def test_header_bolding_and_styling():
     # Header should not repeat across pages (w:tblHeader should be absent)
     assert table.rows[0]._tr.get_or_add_trPr().find(qn("w:tblHeader")) is None
 
+    from docx.enum.table import WD_ALIGN_VERTICAL
+
     hdr_cells = table.rows[0].cells
     for cell in hdr_cells:
+        assert cell.vertical_alignment == WD_ALIGN_VERTICAL.CENTER
         p = cell.paragraphs[0]
         assert len(p.runs) > 0
         assert p.runs[0].font.bold is True
@@ -126,6 +129,7 @@ def test_header_bolding_and_styling():
     # Data row formatting
     data_cells = table.rows[1].cells
     for cell in data_cells:
+        assert cell.vertical_alignment == WD_ALIGN_VERTICAL.CENTER
         p = cell.paragraphs[0]
         assert len(p.runs) > 0
         assert p.runs[0].font.size == Pt(10)

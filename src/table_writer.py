@@ -6,7 +6,7 @@ a Word (.docx) document with proper styling, borders, and column widths.
 from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
@@ -102,6 +102,7 @@ class CastTableWriter:
         for i, text in enumerate(headers):
             hdr_cells[i].text = text
             hdr_cells[i].width = col_widths[i]
+            hdr_cells[i].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
             set_cell_border(hdr_cells[i], **all_borders)
             hp = hdr_cells[i].paragraphs[0]
             hp.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -129,6 +130,7 @@ class CastTableWriter:
 
             for i in range(4):
                 row_cells[i].width = col_widths[i]
+                row_cells[i].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
                 set_cell_border(row_cells[i], **all_borders)
                 rp = row_cells[i].paragraphs[0]
                 rp.paragraph_format.space_before = Pt(2)
