@@ -65,6 +65,7 @@ $KastCmdTarget = Join-Path $UserBin "kast.cmd"
 $CmdLines = @(
     "@echo off",
     "setlocal",
+    "chcp 65001 >nul 2>&1",
     "if exist `"$VenvPython`" (",
     "    `"$VenvPython`" `"$RepoDir\kast.py`" %*",
     ") else (",

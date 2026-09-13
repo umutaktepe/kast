@@ -213,6 +213,14 @@ Screen {
     height: 3;
 }
 
+Input {
+    border: round $primary;
+}
+
+Input:focus {
+    border: round $accent;
+}
+
 .file-input {
     width: 1fr;
     height: 3;
@@ -305,44 +313,44 @@ class KastApp(App):
             # 1. Dosya Seçim Alanı (Yan yana 2 kutu)
             with Horizontal(id="files-row"):
                 with Vertical(classes="file-box"):
-                    yield Label("📥 1. Senaryo (.docx) [Buraya Sürükleyin]:", classes="box-title")
+                    yield Label("1. Senaryo (.docx) [Buraya Sürükleyin]:", classes="box-title")
                     with Horizontal(classes="input-row"):
                         yield PathInput(
                             id="docx-path",
                             classes="file-input",
                             placeholder="DOCX dosyasını buraya sürükleyin veya yazın...",
                         )
-                        yield Button("📂 Gözat", id="btn-browse-docx", classes="browse-btn")
+                        yield Button("Gözat", id="btn-browse-docx", classes="browse-btn")
 
                 with Vertical(classes="file-box file-box-last"):
-                    yield Label("📄 2. Referans PDF [Opsiyonel]:", classes="box-title")
+                    yield Label("2. Referans PDF [Opsiyonel]:", classes="box-title")
                     with Horizontal(classes="input-row"):
                         yield PathInput(
                             id="pdf-path",
                             classes="file-input",
                             placeholder="Opsiyonel referans PDF dosyasını sürükleyin...",
                         )
-                        yield Button("📂 Gözat", id="btn-browse-pdf", classes="browse-btn")
+                        yield Button("Gözat", id="btn-browse-pdf", classes="browse-btn")
 
             # 2. Seçenekler Alanı (Yan yana 2 kutu)
             with Horizontal(id="options-row"):
                 with Vertical(classes="options-col"):
-                    yield Label("📊 Karakter Sıralama", classes="box-title")
+                    yield Label("Karakter Sıralama", classes="box-title")
                     with RadioSet(id="sort-radios"):
                         yield RadioButton("İlk Görünme (Appearance)", id="sort-appearance", value=True)
                         yield RadioButton("Replik Sayısı (Count)", id="sort-count")
                         yield RadioButton("Karakter Adı (A-Z)", id="sort-name")
 
                 with Vertical(classes="options-col options-col-last"):
-                    yield Label("⚙️ Çıktı Seçenekleri", classes="box-title")
+                    yield Label("Çıktı Seçenekleri", classes="box-title")
                     yield Checkbox("Orijinal dosyanın sonuna ekle (--in-place)", id="cb-inplace")
                     yield Checkbox("Sadece kast tablosunu kaydet (--standalone)", id="cb-standalone")
 
             # 3. Butonlar Barı
             with Horizontal(id="buttons-row"):
-                yield Button("🚀 Kast Çıkar", id="btn-extract", variant="success")
-                yield Button("🗑️ Temizle", id="btn-clear", variant="default")
-                yield Button("❌ Çıkış", id="btn-exit", variant="error")
+                yield Button("Kast Çıkar", id="btn-extract", variant="success")
+                yield Button("Temizle", id="btn-clear", variant="default")
+                yield Button("Çıkış", id="btn-exit", variant="error")
 
             # 4. İşlem Günlüğü Kartı (Kalan tüm dikey alanı kaplar)
             with Vertical(id="log-card"):
@@ -359,7 +367,7 @@ class KastApp(App):
         log.write("[bold cyan]Kast 2.0 Hazır![/bold cyan]")
         log.write(
             "• Senaryo dosyanızı [bold yellow]pencerenin herhangi bir yerine sürükleyip bırakabilir[/bold yellow],\n"
-            "• veya [bold green][📂 Gözat][/bold green] butonuna basarak dosya seçebilirsiniz."
+            "• veya [bold green][Gözat][/bold green] butonuna basarak dosya seçebilirsiniz."
         )
 
     def on_paste(self, event: events.Paste) -> None:
@@ -378,13 +386,13 @@ class KastApp(App):
         log = self.query_one("#log-area", RichLog)
         if clean.lower().endswith(".pdf"):
             self.query_one("#pdf-path", PathInput).value = clean
-            log.write(f"[bold cyan][✓] Referans PDF algılandı:[/bold cyan] {clean}")
+            log.write(f"[bold cyan][OK] Referans PDF algılandı:[/bold cyan] {clean}")
             self.notify(f"PDF eklendi: {os.path.basename(clean)}", title="Dosya Algılandı")
         else:
             docx_inp = self.query_one("#docx-path", PathInput)
             docx_inp.value = clean
             docx_inp.focus()
-            log.write(f"[bold green][✓] Senaryo dosyası algılandı:[/bold green] {clean}")
+            log.write(f"[bold green][OK] Senaryo dosyası algılandı:[/bold green] {clean}")
             self.notify(f"DOCX eklendi: {os.path.basename(clean)}", title="Dosya Algılandı")
 
     def on_input_changed(self, event: Input.Changed) -> None:
@@ -437,7 +445,7 @@ class KastApp(App):
             docx_input.value = selected
             docx_input.focus()
             log = self.query_one("#log-area", RichLog)
-            log.write(f"[bold green][✓] DOCX dosyası seçildi:[/bold green] {selected}")
+            log.write(f"[bold green][OK] DOCX dosyası seçildi:[/bold green] {selected}")
 
     def action_browse_pdf(self) -> None:
         """Open native file chooser for PDF."""
@@ -446,7 +454,7 @@ class KastApp(App):
             pdf_input = self.query_one("#pdf-path", PathInput)
             pdf_input.value = selected
             log = self.query_one("#log-area", RichLog)
-            log.write(f"[bold cyan][✓] Referans PDF dosyası seçildi:[/bold cyan] {selected}")
+            log.write(f"[bold cyan][OK] Referans PDF dosyası seçildi:[/bold cyan] {selected}")
 
     def action_clear(self) -> None:
         """Reset inputs and log area."""
@@ -504,7 +512,7 @@ class KastApp(App):
                 sort_by=sort_by,
                 standalone=standalone,
             )
-            log.write("[bold green][✓] Başarıyla tamamlandı![/bold green]")
+            log.write("[bold green][OK] Başarıyla tamamlandı![/bold green]")
             log.write(f"    Kast Tablosu Kaydedildi: [bold underline green]{saved_file}[/bold underline green]")
         except Exception as exc:
             log.write(f"[bold red][!] Çıkarma sırasında hata oluştu:[/bold red] {exc}")
