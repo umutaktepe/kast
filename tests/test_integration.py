@@ -185,7 +185,7 @@ def test_cli_main_interactive(tmp_path, monkeypatch):
     quoted_input = f"'{target_copy}'"
     monkeypatch.setattr("builtins.input", lambda _: quoted_input)
 
-    ret = main([])
+    ret = main(["--cli"])
     assert ret == 0
 
     expected_out = str(tmp_path / "interactive_pororo_kast.docx")
@@ -203,7 +203,7 @@ def test_cli_main_conflict(tmp_path, capsys):
 def test_cli_main_empty_input(monkeypatch):
     """Verify error when empty input is provided."""
     monkeypatch.setattr("builtins.input", lambda _: "")
-    ret = main([])
+    ret = main(["--cli"])
     assert ret == 1
 
 
@@ -238,7 +238,7 @@ def test_cli_main_interactive_with_flags(tmp_path, monkeypatch):
     quoted_input = f"'{target_copy}' --count"
     monkeypatch.setattr("builtins.input", lambda _: quoted_input)
 
-    ret = main([])
+    ret = main(["--cli"])
     assert ret == 0
 
     out_file = str(tmp_path / "interactive_flags_kast.docx")
@@ -247,3 +247,33 @@ def test_cli_main_interactive_with_flags(tmp_path, monkeypatch):
     table = doc.tables[-1]
     counts = [int(row.cells[1].text) for row in table.rows[1:]]
     assert counts == sorted(counts, reverse=True)
+
+
+def test_main_launches_tui(monkeypatch):
+    """Verify main([]) without arguments launches TUI by default."""
+    tui_called = False
+
+    def fake_launch_tui():
+        nonlocal tui_called
+        tui_called = True
+        return 0
+
+    monkeypatch.setattr("src.tui.launch_tui", fake_launch_tui)
+    ret = main([])
+    assert ret == 0
+    assert tui_called is True
+
+
+def test_main_launches_tui_flag(monkeypatch):
+    """Verify main(['--tui']) launches TUI explicitly."""
+    tui_called = False
+
+    def fake_launch_tui():
+        nonlocal tui_called
+        tui_called = True
+        return 0
+
+    monkeypatch.setattr("src.tui.launch_tui", fake_launch_tui)
+    ret = main(["--tui"])
+    assert ret == 0
+    assert tui_called is True

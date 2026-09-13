@@ -10,82 +10,78 @@ Microsoft Word (`.docx`) formatındaki dublaj çeviri senaryolarını doğrudan 
 
 Geleneksel kast çıkarma araçları veya manuel yöntemlere kıyasla Kast 2.0 şu temel avantajları sunar:
 
-1. **DOCX Üzerinden Doğrudan Çalışma:**
+1. **Modern Terminal Kullanıcı Arayüzü (TUI):**
+   - Terminalde yalnızca `kast` yazarak açılan, koyu temalı görsel bir Textual arayüzü sunar.
+   - Sürükle-bırak dosya girdi alanları, radyo butonları, çıktı seçenekleri ve canlı işlem günlüğü içerir.
+2. **Akıllı Hibrit Başlatıcı:**
+   - Argümansız çalıştırıldığında (`kast`) görsel TUI açılır; dosya veya bayrak ile çalıştırıldığında (`kast dosya.docx --count`) doğrudan süper hızlı komut satırı modunda çalışır.
+3. **DOCX Üzerinden Doğrudan Çalışma:**
    - Metinleri kopyalayıp düz metne (`.txt`) çevirmenize veya Word biçimlendirmelerini bozmanıza gerek yoktur. Dökümanı doğrudan olduğu gibi işler.
-2. **Başlık ve Meta Veri Filtreleme (Başlık Silmeye Son!):**
+4. **Başlık ve Meta Veri Filtreleme (Başlık Silmeye Son!):**
    - Senaryonun başında yer alan `FİLMİN ADI`, `ÇEVİRMEN`, `KAYIT TARİHİ`, `SESLENDİRME STÜDYOSU` gibi proje başlıklarını ve `00.41`, `01.12.05` gibi süre kodlarını akıllıca ayırt eder.
    - Başlıkların veya zaman kodlarının yanlışlıkla karaktere dönüşmesi engellenir; senaryo başındaki künyeyi elle silme zorunluluğu tamamen ortadan kalkar.
-3. **Çok Katmanlı Otomatik Sayfa Tespiti:**
+5. **Çok Katmanlı Otomatik Sayfa Tespiti:**
    - Sayfa numaralarını bulmak için Word'de tek tek elle arama yapmaya veya PDF'e dönüştürmeye gerek kalmaz.
    - Belgedeki OpenXML sayfa sonlarını, isteğe bağlı referans PDF eşleştirmesini ve saf Python mizanpaj simülatörünü bir arada kullanarak repliklerin hangi sayfalarda geçtiğini otomatik tespit eder.
-4. **Otomatik Tablo Entegrasyonu ve Güvenli Kayıt:**
+6. **Otomatik Tablo Entegrasyonu ve Güvenli Kayıt:**
    - Çıkarılan kast tablosu Word ile %100 uyumlu tam kenarlıklı (Table Grid) biçimde dökümanın en sonuna yeni bir sayfa olarak eklenir.
    - Orijinal dökümanın güvenliği için varsayılan olarak `<dosya_adi>_kast.docx` adıyla yeni bir kopya oluşturulur (istenirse `--in-place` ile doğrudan orijinal dosyaya da yazılabilir).
 
 ---
 
-## 📋 Gereksinimler ve Kurulum
+## ⚡ Hızlı Kurulum (Tek Komutla)
 
-### Sistem Gereksinimleri
-- **Python:** 3.10 veya üzeri
-- İşletim Sistemi: Linux, macOS veya Windows
+Depoyu klonladıktan sonra işletim sisteminize uygun kurulum scriptini çalıştırarak programı sisteminize entegre edebilirsiniz:
 
-### Bağımlılıklar
-- `python-docx` (>= 1.0.0) — Word dökümanlarını ayrıştırma ve tablo yazma
-- `Pillow` (>= 10.0.0) — Mizanpaj motoru için yazı tipi ve piksel genişlik hesaplamaları
-- `pdfplumber` (>= 0.10.0, opsiyonel) — Referans PDF sayfa eşleştirmesi için
-- `pytest` (>= 8.0.0, geliştirici) — Birim ve entegrasyon testleri için
+### 🐧 Linux (Bash)
+```bash
+git clone https://github.com/umutaktepe/kast.git
+cd kast
+chmod +x install.sh && ./install.sh
+```
+*Bu script sanal ortamı kurar, bağımlılıkları yükler ve `~/.local/bin/kast` sembolik bağını oluşturur. Artık terminalinizin herhangi bir yerinden sadece `kast` yazmanız yeterlidir.*
 
-### Kurulum Adımları
-
-1. Depoyu klonlayın veya indirin:
-   ```bash
-   git clone https://github.com/umutaktepe/kast.git
-   cd kast
-   ```
-
-2. Sanal ortam (virtualenv) oluşturun ve etkinleştirin:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate   # Linux / macOS
-   # veya Windows için: .venv\Scripts\activate
-   ```
-
-3. Bağımlılıkları yükleyin:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### 🪟 Windows (PowerShell)
+```powershell
+git clone https://github.com/umutaktepe/kast.git
+cd kast
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+*Bu script sanal ortamı kurar, bağımlılıkları yükler, `%USERPROFILE%\bin\kast.cmd` başlatıcısını oluşturur ve Kullanıcı `PATH` ortam değişkenine otomatik ekler. Artık CMD veya PowerShell'de sadece `kast` yazmanız yeterlidir.*
 
 ---
 
 ## 💻 Kullanım Şekilleri
 
-### 1. Terminalden Sürükle-Bırak Yöntemi (En Kolay)
-Herhangi bir komut satırı argümanı ezberlemeden programı başlatabilirsiniz:
+### 1. Görsel Terminal Arayüzü (TUI) — Önerilen
+
+Terminalde sadece `kast` yazın:
 
 ```bash
-python3 kast.py
+kast
 ```
 
-Terminalde şu karşılama ekranı görüntülenir:
-```text
-============================================================
- DUBLAJ ÇEVİRİSİ KAST ÇIKARMA PROGRAMI (Kast 2.0)
-============================================================
-Lütfen çeviri DOCX dosyasını buraya sürükleyip bırakın ve Enter'a basın:
-> 
-```
-Dosya yöneticinizden (Nautilus, Finder, Explorer) `.docx` dosyasını terminal penceresine sürükleyip bırakın ve `Enter` tuşuna basın. 
-
-> [!TIP]
-> **Sürükle-Bırak Yaparken Sıralama Seçme:**
-> - İsterseniz sürükleyip bıraktıktan sonra boşluk bırakıp `--count` yazabilirsiniz:
->   `> '/home/.../film.docx' --count`
-> - Veya programı başlatırken `python3 kast.py --count` diyerek başlatırsanız, sürüklediğiniz dosya doğrudan replik sayısına göre sıralanır.
+Karşınıza modern, tam ekran bir metin arayüzü gelecektir:
+- **DOCX Senaryo Dosyası:** Senaryo dosyanızı dosya yöneticinizden sürükleyip doğrudan bu kutucuğa bırakın (tırnak işaretleri otomatik temizlenir).
+- **Referans PDF (Opsiyonel):** Kesin sayfa eşleştirmesi için referans PDF dosyanızı sürükleyip bırakabilirsiniz.
+- **Sıralama Seçenekleri:**
+  - `İlk Görünme Sırası (Appearance)` (Varsayılan)
+  - `Replik Sayısına Göre (Count)`
+  - `Karakter Adına Göre (A-Z)`
+- **Çıktı Seçenekleri:**
+  - `[ ] Orijinal dosyanın sonuna ekle (--in-place)`
+  - `[ ] Sadece kast tablosunu ayrı DOCX olarak kaydet (--standalone)`
+- **İşlem Butonları:**
+  - `[Kast Tablosunu Çıkar]` (Enter veya tıklama ile işlemi başlatır)
+  - `[Temizle]`
+  - `[Çıkış (Q)]`
+- **İşlem Günlüğü ve Özeti:** Analiz tamamlandığında toplam paragraf, replik, tespit edilen karakter sayısı ve kaydedilen dosya yolu anında görüntülenir.
 
 ---
 
-### 2. Komut Satırı (CLI) ile Kullanım
+### 2. Komut Satırı (CLI) ile Hızlı Kullanım
+
+Herhangi bir grafik arayüz açmadan hızlıca işlem yapmak için dosya adını doğrudan argüman olarak verebilirsiniz:
 
 #### Temel Kullanım
 ```bash
@@ -205,12 +201,13 @@ Proje kapsamlı bir test süitine (`pytest`) sahiptir:
 .venv/bin/pytest -v
 ```
 
-### Test Kapsamı (55/55 Başarılı Test):
+### Test Kapsamı (61/61 Başarılı Test):
 - `tests/test_models.py` — Veri modelleri, replik ekleme ve sayfa formatlama testleri.
 - `tests/test_parser.py` — Başlık tespiti, zaman kodu ayrıştırma ve karmaşık diyalog satırları.
 - `tests/test_paginator.py` — Çok katmanlı sayfa motoru, Pillow font simülasyonu, XML kesmeleri ve PDF referansı.
 - `tests/test_table_writer.py` — Tablo oluşturma, OpenXML kenarlıkları, dikey ortalama, dinamik font tespiti, sütun genişlikleri ve bağımsız belge modu.
-- `tests/test_integration.py` — Uçtan uca boru hattı, CLI argümanları, `--count` kısayolu, sürükle-bırak parametreleri ve Pororo örnek döküman doğrulaması.
+- `tests/test_integration.py` — Uçtan uca boru hattı, CLI argümanları, `--count` kısayolu, sürükle-bırak parametreleri, TUI dispatch ve Pororo örnek döküman doğrulaması.
+- `tests/test_tui.py` — Textual TUI widget montajı, buton aksiyonları, hata yakalama ve uçtan uca arayüz testleri.
 
 
 ---

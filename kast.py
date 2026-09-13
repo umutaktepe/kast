@@ -169,6 +169,19 @@ def build_cli_parser() -> argparse.ArgumentParser:
         help="Karakterleri ada göre alfabetik sırala (--sort name kısayolu).",
     )
     parser.add_argument(
+        "--tui",
+        "-t",
+        dest="tui_mode",
+        action="store_true",
+        help="Görsel Terminal Arayüzünü (TUI) başlat.",
+    )
+    parser.add_argument(
+        "--cli",
+        dest="cli_mode",
+        action="store_true",
+        help="TUI yerine doğrudan komut satırı modunda çalıştır.",
+    )
+    parser.add_argument(
         "--in-place",
         dest="in_place",
         action="store_true",
@@ -191,8 +204,18 @@ def build_cli_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI and interactive entry point."""
+    raw_argv = sys.argv[1:] if argv is None else argv
     parser = build_cli_parser()
     args = parser.parse_args(argv)
+
+    # Argümansız çağrıldığında veya --tui verildiğinde TUI aç
+    should_launch_tui = args.tui_mode or (not raw_argv and not args.cli_mode)
+    if should_launch_tui:
+        try:
+            from src.tui import launch_tui
+            return launch_tui()
+        except ImportError:
+            pass
 
     if getattr(args, "sort_count", False):
         args.sort_by = "count"
