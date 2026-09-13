@@ -162,3 +162,26 @@ async def test_tui_input_routing_swap():
         assert docx_inp.value == ""
         assert pdf_inp.value == "/home/user/wrong_box.pdf"
 
+
+def test_select_file_dialog_cancelled(monkeypatch):
+    """Verify select_file_dialog returns None immediately when cancelled."""
+    import subprocess
+    from src.tui import select_file_dialog
+
+    class FakeProcess:
+        returncode = 1
+        stdout = ""
+
+    call_count = 0
+
+    def fake_run(*a, **kw):
+        nonlocal call_count
+        call_count += 1
+        return FakeProcess()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    res = select_file_dialog("Test", ["docx"])
+    assert res is None
+    # Must only call zenity once, and NOT cascade to kdialog or tkinter!
+    assert call_count == 1
+

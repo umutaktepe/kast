@@ -70,11 +70,12 @@ def select_file_dialog(title: str, extensions: List[str]) -> Optional[str]:
             pattern = f"Desteklenen Dosyalar | {filters}"
             cmd = ["zenity", "--file-selection", f"--title={title}", f"--file-filter={pattern}"]
             try:
-                res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
                 if res.returncode == 0:
                     selected = res.stdout.strip()
-                    if selected and os.path.exists(selected):
-                        return selected
+                    return selected if (selected and os.path.exists(selected)) else None
+                # Kullanıcı iptal etti (Cancel / ESC / kapatma) -> başka diyalog açma
+                return None
             except Exception:
                 pass
 
@@ -82,11 +83,12 @@ def select_file_dialog(title: str, extensions: List[str]) -> Optional[str]:
             filters = " ".join(f"*.{ext}" for ext in extensions)
             cmd = ["kdialog", "--getopenfilename", os.path.expanduser("~"), filters, "--title", title]
             try:
-                res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
                 if res.returncode == 0:
                     selected = res.stdout.strip()
-                    if selected and os.path.exists(selected):
-                        return selected
+                    return selected if (selected and os.path.exists(selected)) else None
+                # Kullanıcı iptal etti -> başka diyalog açma
+                return None
             except Exception:
                 pass
 
@@ -105,12 +107,12 @@ def select_file_dialog(title: str, extensions: List[str]) -> Optional[str]:
                 ["powershell", "-NoProfile", "-Command", ps_cmd],
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=120,
             )
             if res.returncode == 0:
                 selected = res.stdout.strip()
-                if selected and os.path.exists(selected):
-                    return selected
+                return selected if (selected and os.path.exists(selected)) else None
+            return None
         except Exception:
             pass
 
@@ -119,15 +121,15 @@ def select_file_dialog(title: str, extensions: List[str]) -> Optional[str]:
         ext_list = ", ".join(f'"{ext}"' for ext in extensions)
         apple_script = f'POSIX path of (choose file with prompt "{title}" of type {{{ext_list}}})'
         try:
-            res = subprocess.run(["osascript", "-e", apple_script], capture_output=True, text=True, timeout=60)
+            res = subprocess.run(["osascript", "-e", apple_script], capture_output=True, text=True, timeout=120)
             if res.returncode == 0:
                 selected = res.stdout.strip()
-                if selected and os.path.exists(selected):
-                    return selected
+                return selected if (selected and os.path.exists(selected)) else None
+            return None
         except Exception:
             pass
 
-    # 4. Tkinter fallback
+    # 4. Tkinter fallback (Yalnızca yerel diyalog aracı bulunamazsa veya başlatılamazsa)
     try:
         import tkinter as tk
         from tkinter import filedialog
@@ -143,6 +145,7 @@ def select_file_dialog(title: str, extensions: List[str]) -> Optional[str]:
         root.destroy()
         if selected and os.path.exists(selected):
             return selected
+        return None
     except Exception:
         pass
 
