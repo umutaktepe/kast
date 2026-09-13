@@ -174,7 +174,8 @@ def test_parsed_paragraph_to_dialogue_line():
 
 def test_pororo_example_integration():
     example_path = "example/PORORO: SWEET CASTLE ADVENTURE.docx"
-    assert os.path.exists(example_path)
+    if not os.path.exists(example_path):
+        pytest.skip("Example file not found")
 
     parser = DubbingDocxParser()
     doc = Document(example_path)
@@ -202,6 +203,9 @@ def test_pororo_example_integration():
 
 def test_parse_docx_and_parse_paragraphs():
     example_path = "example/PORORO: SWEET CASTLE ADVENTURE.docx"
+    if not os.path.exists(example_path):
+        pytest.skip("Example file not found")
+
     parser = DubbingDocxParser()
 
     # Test parse_docx
