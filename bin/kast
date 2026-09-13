@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Scriptin gerçek konumunu sembolik bağları takip ederek bul
+SOURCE_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+REPO_DIR="$(cd "$(dirname "$SOURCE_PATH")/.." && pwd)"
+
+VENV_PYTHON="$REPO_DIR/.venv/bin/python3"
+
+if [ -x "$VENV_PYTHON" ]; then
+    exec "$VENV_PYTHON" "$REPO_DIR/kast.py" "$@"
+else
+    echo "[Kast] Sanal ortam (.venv) bulunamadı. Lütfen önce ./install.sh çalıştırın." >&2
+    if command -v python3 >/dev/null 2>&1; then
+        echo "[Kast] Sistemdeki python3 ile çalıştırılmayı deneniyor..." >&2
+        exec python3 "$REPO_DIR/kast.py" "$@"
+    fi
+    exit 1
+fi
