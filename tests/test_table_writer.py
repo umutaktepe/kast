@@ -66,7 +66,7 @@ def test_table_borders():
 
 
 def test_column_widths():
-    """Verify that column widths match [1.8, 1.1, 2.3, 1.3] inches for all cells."""
+    """Verify that column widths match [2.0, 1.0, 2.3, 1.2] inches for all cells."""
     doc = Document()
     writer = CastTableWriter()
 
@@ -77,11 +77,15 @@ def test_column_widths():
     writer.append_cast_table(doc, result)
 
     table = doc.tables[0]
-    expected_widths = [Inches(1.8), Inches(1.1), Inches(2.3), Inches(1.3)]
+    expected_widths = [Inches(2.0), Inches(1.0), Inches(2.3), Inches(1.2)]
 
     for row in table.rows:
         for idx, expected_width in enumerate(expected_widths):
             assert row.cells[idx].width == expected_width
+            # Verify paragraph indents are zeroed to prevent inheriting document hanging indents
+            p = row.cells[idx].paragraphs[0]
+            assert p.paragraph_format.left_indent == Inches(0)
+            assert p.paragraph_format.first_line_indent == Inches(0)
 
 
 def test_header_bolding_and_styling():

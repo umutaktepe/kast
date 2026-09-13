@@ -69,6 +69,9 @@ class CastTableWriter:
         p = doc.add_paragraph()
         p.paragraph_format.space_before = Pt(0)
         p.paragraph_format.space_after = Pt(12)
+        p.paragraph_format.left_indent = Inches(0)
+        p.paragraph_format.right_indent = Inches(0)
+        p.paragraph_format.first_line_indent = Inches(0)
         run = p.add_run("KAST TABLOSU")
         run.bold = True
         run.font.size = Pt(14)
@@ -80,7 +83,7 @@ class CastTableWriter:
         table.autofit = False
 
         # Sütun genişlikleri (Karakter, Replik Sayısı, Sayfalar, Notlar)
-        col_widths = [Inches(1.8), Inches(1.1), Inches(2.3), Inches(1.3)]
+        col_widths = [Inches(2.0), Inches(1.0), Inches(2.3), Inches(1.2)]
         for idx, width in enumerate(col_widths):
             table.columns[idx].width = width
 
@@ -105,6 +108,9 @@ class CastTableWriter:
             hp.alignment = WD_ALIGN_PARAGRAPH.LEFT
             hp.paragraph_format.space_before = Pt(2)
             hp.paragraph_format.space_after = Pt(2)
+            hp.paragraph_format.left_indent = Inches(0)
+            hp.paragraph_format.right_indent = Inches(0)
+            hp.paragraph_format.first_line_indent = Inches(0)
             if hp.runs:
                 hp.runs[0].font.bold = True
                 hp.runs[0].font.name = "Arial"
@@ -128,6 +134,9 @@ class CastTableWriter:
                 rp = row_cells[i].paragraphs[0]
                 rp.paragraph_format.space_before = Pt(2)
                 rp.paragraph_format.space_after = Pt(2)
+                rp.paragraph_format.left_indent = Inches(0)
+                rp.paragraph_format.right_indent = Inches(0)
+                rp.paragraph_format.first_line_indent = Inches(0)
                 if rp.runs:
                     rp.runs[0].font.name = "Arial"
                     rp.runs[0].font.size = Pt(10)
