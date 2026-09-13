@@ -3,6 +3,7 @@
 from src.models import CastExtractionResult, CharacterStats, DialogueLine
 from src.parser import DubbingDocxParser, ParsedParagraph, KNOWN_METADATA_KEYS
 from src.paginator import PurePythonLayoutPaginator, DocumentPaginator, Paginator
+from src.table_writer import CastTableWriter, append_cast_table, save_result
 
 __all__ = [
     "DialogueLine",
@@ -14,5 +15,8 @@ __all__ = [
     "PurePythonLayoutPaginator",
     "DocumentPaginator",
     "Paginator",
+    "CastTableWriter",
+    "append_cast_table",
+    "save_result",
 ]
 
