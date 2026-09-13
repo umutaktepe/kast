@@ -3,6 +3,7 @@
 *_kast.docx
 .pytest_cache/
 example/
+*.spec
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
