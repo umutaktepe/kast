@@ -205,3 +205,45 @@ def test_cli_main_empty_input(monkeypatch):
     monkeypatch.setattr("builtins.input", lambda _: "")
     ret = main([])
     assert ret == 1
+
+
+def test_cli_main_count_shortcut(tmp_path):
+    """Verify --count shortcut flag."""
+    src_file = "example/PORORO: SWEET CASTLE ADVENTURE.docx"
+    if not os.path.exists(src_file):
+        pytest.skip("Example file not found")
+    target_copy = tmp_path / "cli_shortcut.docx"
+    shutil.copy(src_file, target_copy)
+
+    ret = main([str(target_copy), "--count"])
+    assert ret == 0
+
+    out_file = str(tmp_path / "cli_shortcut_kast.docx")
+    assert os.path.exists(out_file)
+    doc = Document(out_file)
+    # Check that rows are sorted by count descending
+    table = doc.tables[-1]
+    counts = [int(row.cells[1].text) for row in table.rows[1:]]
+    assert counts == sorted(counts, reverse=True)
+
+
+def test_cli_main_interactive_with_flags(tmp_path, monkeypatch):
+    """Verify drag-and-drop prompt when user appends --count after file path."""
+    src_file = "example/PORORO: SWEET CASTLE ADVENTURE.docx"
+    if not os.path.exists(src_file):
+        pytest.skip("Example file not found")
+    target_copy = tmp_path / "interactive_flags.docx"
+    shutil.copy(src_file, target_copy)
+
+    quoted_input = f"'{target_copy}' --count"
+    monkeypatch.setattr("builtins.input", lambda _: quoted_input)
+
+    ret = main([])
+    assert ret == 0
+
+    out_file = str(tmp_path / "interactive_flags_kast.docx")
+    assert os.path.exists(out_file)
+    doc = Document(out_file)
+    table = doc.tables[-1]
+    counts = [int(row.cells[1].text) for row in table.rows[1:]]
+    assert counts == sorted(counts, reverse=True)

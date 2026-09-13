@@ -75,7 +75,13 @@ Terminalde şu karşılama ekranı görüntülenir:
 Lütfen çeviri DOCX dosyasını buraya sürükleyip bırakın ve Enter'a basın:
 > 
 ```
-Dosya yöneticinizden (Finder, Nautilus, Windows Explorer) `.docx` dosyasını terminal penceresine sürükleyip bırakın ve `Enter` tuşuna basın. Program dökümanı işleyip `<dosya_adi>_kast.docx` dosyasını aynı klasörde oluşturacaktır.
+Dosya yöneticinizden (Nautilus, Finder, Explorer) `.docx` dosyasını terminal penceresine sürükleyip bırakın ve `Enter` tuşuna basın. 
+
+> [!TIP]
+> **Sürükle-Bırak Yaparken Sıralama Seçme:**
+> - İsterseniz sürükleyip bıraktıktan sonra boşluk bırakıp `--count` yazabilirsiniz:
+>   `> '/home/.../film.docx' --count`
+> - Veya programı başlatırken `python3 kast.py --count` diyerek başlatırsanız, sürüklediğiniz dosya doğrudan replik sayısına göre sıralanır.
 
 ---
 
@@ -87,21 +93,26 @@ python3 kast.py "senaryo.docx"
 ```
 *Çıktı:* `senaryo_kast.docx` olarak dökümanın sonuna kast tablosu eklenmiş yeni bir dosya oluşturulur.
 
-#### Karakter Sıralama Seçenekleri (`--sort`)
-Kast tablosundaki karakterlerin listelenme sırasını `--sort` parametresiyle belirleyebilirsiniz:
+#### Karakter Sıralama Seçenekleri (`--count`, `--name`, `--sort`)
+Kast tablosundaki karakterlerin listelenme sırasını belirlemek için:
 
-- **`appearance` (Varsayılan):** Karakterlerin senaryoda ilk konuşma / görünme sırasına göre.
+- **`--count` veya `-c`:** En çok konuşan karakterden en aza doğru (başrollerden figürasyona):
   ```bash
-  python3 kast.py "senaryo.docx" --sort appearance
-  ```
-- **`count`:** En çok konuşan karakterden en aza doğru (başrollerden figürasyona):
-  ```bash
+  python3 kast.py "senaryo.docx" --count
+  # veya
   python3 kast.py "senaryo.docx" --sort count
   ```
-- **`name`:** Karakter adına göre alfabetik (A-Z):
+- **`--name` veya `-n`:** Karakter adına göre alfabetik (A-Z):
   ```bash
+  python3 kast.py "senaryo.docx" --name
+  # veya
   python3 kast.py "senaryo.docx" --sort name
   ```
+- **`--sort appearance` (Varsayılan):** Karakterlerin senaryoda ilk konuşma / görünme sırasına göre:
+  ```bash
+  python3 kast.py "senaryo.docx"
+  ```
+
 
 #### Orijinal Dosyanın Üzerine Yazma (`--in-place`)
 Yeni bir dosya oluşturmak yerine orijinal dökümanın sonuna eklemek için:
@@ -194,12 +205,12 @@ Proje kapsamlı bir test süitine (`pytest`) sahiptir:
 .venv/bin/pytest -v
 ```
 
-### Test Kapsamı (53/53 Başarılı Test):
+### Test Kapsamı (55/55 Başarılı Test):
 - `tests/test_models.py` — Veri modelleri, replik ekleme ve sayfa formatlama testleri.
 - `tests/test_parser.py` — Başlık tespiti, zaman kodu ayrıştırma ve karmaşık diyalog satırları.
 - `tests/test_paginator.py` — Çok katmanlı sayfa motoru, Pillow font simülasyonu, XML kesmeleri ve PDF referansı.
 - `tests/test_table_writer.py` — Tablo oluşturma, OpenXML kenarlıkları, dikey ortalama, dinamik font tespiti, sütun genişlikleri ve bağımsız belge modu.
-- `tests/test_integration.py` — Uçtan uca boru hattı, CLI argümanları, tırnaklı sürükle-bırak yolu ve Pororo örnek döküman doğrulaması.
+- `tests/test_integration.py` — Uçtan uca boru hattı, CLI argümanları, `--count` kısayolu, sürükle-bırak parametreleri ve Pororo örnek döküman doğrulaması.
 
 
 ---

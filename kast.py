@@ -155,6 +155,20 @@ def build_cli_parser() -> argparse.ArgumentParser:
         help="Karakter sıralama türü: appearance (varsayılan), count veya name.",
     )
     parser.add_argument(
+        "--count",
+        "-c",
+        dest="sort_count",
+        action="store_true",
+        help="Karakterleri replik sayısına göre çoktan aza sırala (--sort count kısayolu).",
+    )
+    parser.add_argument(
+        "--name",
+        "-n",
+        dest="sort_name",
+        action="store_true",
+        help="Karakterleri ada göre alfabetik sırala (--sort name kısayolu).",
+    )
+    parser.add_argument(
         "--in-place",
         dest="in_place",
         action="store_true",
@@ -180,14 +194,37 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = build_cli_parser()
     args = parser.parse_args(argv)
 
+    if getattr(args, "sort_count", False):
+        args.sort_by = "count"
+    elif getattr(args, "sort_name", False):
+        args.sort_by = "name"
+
     print("=" * 60)
     print(" DUBLAJ ÇEVİRİSİ KAST ÇIKARMA PROGRAMI (Kast 2.0)")
     print("=" * 60)
 
     docx_file = args.docx_file
     if not docx_file:
-        raw_input = input("Lütfen çeviri DOCX dosyasını buraya sürükleyip bırakın ve Enter'a basın:\n> ")
-        docx_file = raw_input.strip("'\"")
+        raw_input = input("Lütfen çeviri DOCX dosyasını buraya sürükleyip bırakın ve Enter'a basın:\n> ").strip()
+        import shlex
+        try:
+            tokens = shlex.split(raw_input)
+        except Exception:
+            tokens = [raw_input]
+
+        if tokens:
+            docx_file = tokens[0].strip("'\"")
+            for idx, token in enumerate(tokens[1:], start=1):
+                if token in ("--count", "-c"):
+                    args.sort_by = "count"
+                elif token in ("--name", "-n"):
+                    args.sort_by = "name"
+                elif token == "--sort" and idx < len(tokens) - 1:
+                    args.sort_by = tokens[idx + 1]
+                elif token in ("--in-place", "-i"):
+                    args.in_place = True
+                elif token in ("--standalone", "-s"):
+                    args.standalone = True
 
     if not docx_file:
         print("Hata: Dosya belirtilmedi.")
