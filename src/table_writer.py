@@ -94,7 +94,6 @@ class CastTableWriter:
         # 4. Başlık satırı
         hdr_row = table.rows[0]
         hdr_trPr = hdr_row._tr.get_or_add_trPr()
-        hdr_trPr.append(OxmlElement("w:tblHeader"))
         hdr_trPr.append(OxmlElement("w:cantSplit"))
 
         hdr_cells = hdr_row.cells

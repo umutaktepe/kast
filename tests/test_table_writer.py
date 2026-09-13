@@ -112,6 +112,9 @@ def test_header_bolding_and_styling():
 
     # Header row formatting
     table = doc.tables[0]
+    # Header should not repeat across pages (w:tblHeader should be absent)
+    assert table.rows[0]._tr.get_or_add_trPr().find(qn("w:tblHeader")) is None
+
     hdr_cells = table.rows[0].cells
     for cell in hdr_cells:
         p = cell.paragraphs[0]
