@@ -1,4 +1,5 @@
 import os
+import pytest
 from docx import Document
 from src.parser import DubbingDocxParser, ParsedParagraph
 from src.models import DialogueLine

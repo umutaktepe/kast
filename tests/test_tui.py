@@ -206,3 +206,97 @@ async def test_tui_sort_radio_options_visible():
         assert b3.region.y < col_bottom_y
 
 
+@pytest.mark.asyncio
+async def test_clean_radio_and_checkbox_rendering():
+    """Verify CleanRadioButton and CleanCheckbox render ASCII safe indicators (*)/( ) and [X]/[ ]."""
+    from src.tui import CleanRadioButton, CleanCheckbox
+
+    app = KastApp()
+    async with app.run_test() as pilot:
+        r_app = app.query_one("#sort-appearance", CleanRadioButton)
+        r_cnt = app.query_one("#sort-count", CleanRadioButton)
+        cb_in = app.query_one("#cb-inplace", CleanCheckbox)
+        cb_st = app.query_one("#cb-standalone", CleanCheckbox)
+
+        # Initial state: sort-appearance is True, others False
+        assert "(*)" in str(r_app.render())
+        assert "( )" in str(r_cnt.render())
+        assert "[ ]" in str(cb_in.render())
+        assert "[ ]" in str(cb_st.render())
+
+        # Toggle radio button
+        r_cnt.value = True
+        await pilot.pause()
+        assert "( )" in str(r_app.render())
+        assert "(*)" in str(r_cnt.render())
+
+        # Toggle checkbox
+        cb_in.value = True
+        await pilot.pause()
+        assert "[X]" in str(cb_in.render())
+        assert "[ ]" in str(cb_st.render())
+
+
+def test_select_file_dialog_windows_tkinter(monkeypatch, tmp_path):
+    """Verify select_file_dialog uses Tkinter cleanly on Windows when available."""
+    import platform
+    import sys
+    from unittest.mock import MagicMock
+    from src.tui import select_file_dialog
+
+    fake_file = tmp_path / "win_test.docx"
+    fake_file.write_text("dummy")
+
+    monkeypatch.setattr(platform, "system", lambda: "Windows")
+
+    fake_tk = MagicMock()
+    fake_filedialog = MagicMock()
+    fake_tk.filedialog = fake_filedialog
+    fake_filedialog.askopenfilename.return_value = str(fake_file)
+
+    monkeypatch.setitem(sys.modules, "tkinter", fake_tk)
+    monkeypatch.setitem(sys.modules, "tkinter.filedialog", fake_filedialog)
+
+    selected = select_file_dialog("Test Windows", ["docx"])
+    assert selected == os.path.normpath(str(fake_file))
+
+
+def test_select_file_dialog_windows_powershell_fallback(monkeypatch, tmp_path):
+    """Verify select_file_dialog falls back to PowerShell with CREATE_NO_WINDOW if tkinter fails."""
+    import platform
+    import subprocess
+    from src.tui import select_file_dialog
+
+    fake_file = tmp_path / "ps_test.docx"
+    fake_file.write_text("dummy")
+
+    monkeypatch.setattr(platform, "system", lambda: "Windows")
+
+    # Simulate tkinter not working by raising in import or askopenfilename
+    import sys
+    monkeypatch.setitem(sys.modules, "tkinter", None)
+
+    class FakePSProcess:
+        returncode = 0
+        stdout = str(fake_file) + "\n"
+
+    passed_creationflags = []
+
+    def fake_run(cmd, **kwargs):
+        passed_creationflags.append(kwargs.get("creationflags"))
+        return FakePSProcess()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    selected = select_file_dialog("Test PowerShell", ["docx"])
+    assert selected == os.path.normpath(str(fake_file))
+    assert 0x08000000 in passed_creationflags
+
+
+def test_setup_windows_console_does_not_crash():
+    """Verify setup_windows_console executes without error on any platform."""
+    from src.tui import setup_windows_console
+    setup_windows_console()
+
+
+

@@ -16,6 +16,8 @@ from typing import List, Optional
 from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.content import Content
+from textual.style import Style
 from textual.widgets import (
     Button,
     Checkbox,
@@ -29,6 +31,22 @@ from textual.widgets import (
 )
 
 from kast import process_cast_document
+
+
+def setup_windows_console() -> None:
+    """Ensure Windows console is configured for UTF-8 and ANSI VT processing."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+            ctypes.windll.kernel32.SetConsoleCP(65001)
+            if hasattr(sys.stdout, "reconfigure"):
+                sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            if hasattr(sys.stderr, "reconfigure"):
+                sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 
 def clean_drag_drop_path(raw_text: str) -> str:
@@ -57,8 +75,9 @@ def select_file_dialog(title: str, extensions: List[str]) -> Optional[str]:
     """Open a native OS file dialog to select a file.
 
     Supports:
+    - Windows: Tkinter first (fast, in-process, zero console disruption),
+      fallback to PowerShell with CREATE_NO_WINDOW.
     - Linux: zenity, kdialog, or tkinter fallback
-    - Windows: PowerShell System.Windows.Forms.OpenFileDialog
     - macOS: AppleScript osascript
     """
     system = platform.system()
@@ -73,8 +92,7 @@ def select_file_dialog(title: str, extensions: List[str]) -> Optional[str]:
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
                 if res.returncode == 0:
                     selected = res.stdout.strip()
-                    return selected if (selected and os.path.exists(selected)) else None
-                # Kullanıcı iptal etti (Cancel / ESC / kapatma) -> başka diyalog açma
+                    return os.path.normpath(selected) if (selected and os.path.exists(selected)) else None
                 return None
             except Exception:
                 pass
@@ -86,14 +104,34 @@ def select_file_dialog(title: str, extensions: List[str]) -> Optional[str]:
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
                 if res.returncode == 0:
                     selected = res.stdout.strip()
-                    return selected if (selected and os.path.exists(selected)) else None
-                # Kullanıcı iptal etti -> başka diyalog açma
+                    return os.path.normpath(selected) if (selected and os.path.exists(selected)) else None
                 return None
             except Exception:
                 pass
 
     # 2. Windows
     elif system == "Windows":
+        # 2a. Try Tkinter first (fastest, standard in Windows Python, no subprocess/console impact)
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            file_types = [
+                ("Desteklenen Dosyalar", tuple(f"*.{ext}" for ext in extensions)),
+                ("Tum Dosyalar", "*.*"),
+            ]
+            selected = filedialog.askopenfilename(title=title, filetypes=file_types)
+            root.destroy()
+            if selected and os.path.exists(selected):
+                return os.path.normpath(selected)
+            return None
+        except Exception:
+            pass
+
+        # 2b. Fallback to PowerShell OpenFileDialog with CREATE_NO_WINDOW
         filter_str = f"Desteklenen Dosyalar (*.{extensions[0]})|*.{extensions[0]}|Tum Dosyalar (*.*)|*.*"
         ps_cmd = (
             f"Add-Type -AssemblyName System.Windows.Forms; "
@@ -103,15 +141,19 @@ def select_file_dialog(title: str, extensions: List[str]) -> Optional[str]:
             f"if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{ Write-Output $d.FileName }}"
         )
         try:
+            # CREATE_NO_WINDOW = 0x08000000 prevents attaching to or altering current console
+            creationflags = 0x08000000
             res = subprocess.run(
                 ["powershell", "-NoProfile", "-Command", ps_cmd],
                 capture_output=True,
                 text=True,
                 timeout=120,
+                creationflags=creationflags,
             )
             if res.returncode == 0:
                 selected = res.stdout.strip()
-                return selected if (selected and os.path.exists(selected)) else None
+                if selected and os.path.exists(selected):
+                    return os.path.normpath(selected)
             return None
         except Exception:
             pass
@@ -124,12 +166,12 @@ def select_file_dialog(title: str, extensions: List[str]) -> Optional[str]:
             res = subprocess.run(["osascript", "-e", apple_script], capture_output=True, text=True, timeout=120)
             if res.returncode == 0:
                 selected = res.stdout.strip()
-                return selected if (selected and os.path.exists(selected)) else None
+                return os.path.normpath(selected) if (selected and os.path.exists(selected)) else None
             return None
         except Exception:
             pass
 
-    # 4. Tkinter fallback (Yalnızca yerel diyalog aracı bulunamazsa veya başlatılamazsa)
+    # 4. Tkinter fallback (Linux/macOS fallback if external tools missing)
     try:
         import tkinter as tk
         from tkinter import filedialog
@@ -144,7 +186,7 @@ def select_file_dialog(title: str, extensions: List[str]) -> Optional[str]:
         selected = filedialog.askopenfilename(title=title, filetypes=file_types)
         root.destroy()
         if selected and os.path.exists(selected):
-            return selected
+            return os.path.normpath(selected)
         return None
     except Exception:
         pass
@@ -171,6 +213,48 @@ class PathInput(Input):
             self.value = cleaned
 
 
+class CleanRadioButton(RadioButton):
+    """RadioButton that renders cleanly on all terminals (ASCII safe (*)/( ))."""
+
+    BUTTON_LEFT = "("
+    BUTTON_RIGHT = ")"
+
+    @property
+    def _button(self) -> Content:
+        inner = "*" if self.value else " "
+        button_style = self.get_visual_style("toggle--button")
+        side_style = Style(
+            foreground=button_style.background,
+            background=self.background_colors[1],
+        )
+        return Content.assemble(
+            (self.BUTTON_LEFT, side_style),
+            (inner, button_style),
+            (self.BUTTON_RIGHT, side_style),
+        )
+
+
+class CleanCheckbox(Checkbox):
+    """Checkbox that renders cleanly on all terminals (ASCII safe [X]/[ ])."""
+
+    BUTTON_LEFT = "["
+    BUTTON_RIGHT = "]"
+
+    @property
+    def _button(self) -> Content:
+        inner = "X" if self.value else " "
+        button_style = self.get_visual_style("toggle--button")
+        side_style = Style(
+            foreground=button_style.background,
+            background=self.background_colors[1],
+        )
+        return Content.assemble(
+            (self.BUTTON_LEFT, side_style),
+            (inner, button_style),
+            (self.BUTTON_RIGHT, side_style),
+        )
+
+
 TUI_CSS = """
 Screen {
     background: $surface-darken-1;
@@ -193,14 +277,14 @@ Screen {
     width: 1fr;
     height: 100%;
     background: $surface;
-    border: round $primary;
+    border: solid $primary;
     padding: 0 1;
     margin-right: 1;
 }
 
 .file-box-last {
     margin-right: 0;
-    border: round $secondary;
+    border: solid $secondary;
 }
 
 .box-title {
@@ -214,11 +298,15 @@ Screen {
 }
 
 Input {
-    border: round $primary;
+    border: solid $primary;
 }
 
 Input:focus {
-    border: round $accent;
+    border: solid $accent;
+}
+
+Input.-invalid {
+    border: solid $error;
 }
 
 .file-input {
@@ -230,6 +318,7 @@ Input:focus {
     min-width: 11;
     margin-left: 1;
     height: 3;
+    border: none;
 }
 
 #options-row {
@@ -241,7 +330,7 @@ Input:focus {
 .options-col {
     width: 1fr;
     height: 100%;
-    border: round $primary-darken-1;
+    border: solid $primary-darken-1;
     background: $surface;
     padding: 0 1;
     margin-right: 1;
@@ -260,12 +349,22 @@ RadioSet {
 RadioButton {
     height: 1;
     padding: 0;
+    border: none;
+    background: transparent;
+}
+
+RadioButton:focus {
+    border: none;
 }
 
 Checkbox {
     height: 1;
     padding: 0;
     background: transparent;
+    border: none;
+}
+
+Checkbox:focus {
     border: none;
 }
 
@@ -281,10 +380,27 @@ Checkbox {
     min-width: 18;
 }
 
+Button {
+    border: none;
+    height: 3;
+}
+
+Button:hover {
+    border: none;
+}
+
+Button:focus {
+    border: none;
+}
+
+Button.-active {
+    border: none;
+}
+
 #log-card {
     height: 1fr;
     background: $surface;
-    border: round $primary;
+    border: solid $primary;
     padding: 0 1;
 }
 
@@ -292,6 +408,14 @@ Checkbox {
     height: 100%;
     background: $background;
     border: none;
+}
+
+HeaderIcon {
+    display: none;
+}
+
+FooterKey.-command-palette {
+    border-left: none;
 }
 """
 
@@ -337,14 +461,14 @@ class KastApp(App):
                 with Vertical(classes="options-col"):
                     yield Label("Karakter Sıralama", classes="box-title")
                     with RadioSet(id="sort-radios"):
-                        yield RadioButton("İlk Görünme (Appearance)", id="sort-appearance", value=True)
-                        yield RadioButton("Replik Sayısı (Count)", id="sort-count")
-                        yield RadioButton("Karakter Adı (A-Z)", id="sort-name")
+                        yield CleanRadioButton("İlk Görünme (Appearance)", id="sort-appearance", value=True)
+                        yield CleanRadioButton("Replik Sayısı (Count)", id="sort-count")
+                        yield CleanRadioButton("Karakter Adı (A-Z)", id="sort-name")
 
                 with Vertical(classes="options-col options-col-last"):
                     yield Label("Çıktı Seçenekleri", classes="box-title")
-                    yield Checkbox("Orijinal dosyanın sonuna ekle (--in-place)", id="cb-inplace")
-                    yield Checkbox("Sadece kast tablosunu kaydet (--standalone)", id="cb-standalone")
+                    yield CleanCheckbox("Orijinal dosyanın sonuna ekle (--in-place)", id="cb-inplace")
+                    yield CleanCheckbox("Sadece kast tablosunu kaydet (--standalone)", id="cb-standalone")
 
             # 3. Butonlar Barı
             with Horizontal(id="buttons-row"):
@@ -366,8 +490,8 @@ class KastApp(App):
         log = self.query_one("#log-area", RichLog)
         log.write("[bold cyan]Kast 2.0 Hazır![/bold cyan]")
         log.write(
-            "• Senaryo dosyanızı [bold yellow]pencerenin herhangi bir yerine sürükleyip bırakabilir[/bold yellow],\n"
-            "• veya [bold green][Gözat][/bold green] butonuna basarak dosya seçebilirsiniz."
+            "- Senaryo dosyanızı [bold yellow]pencerenin herhangi bir yerine sürükleyip bırakabilir[/bold yellow],\n"
+            "- veya [bold green][Gözat][/bold green] butonuna basarak dosya seçebilirsiniz."
         )
 
     def on_paste(self, event: events.Paste) -> None:
@@ -439,22 +563,40 @@ class KastApp(App):
 
     def action_browse_docx(self) -> None:
         """Open native file chooser for DOCX."""
-        selected = select_file_dialog("DOCX Senaryo Dosyası Seçin", ["docx", "DOCX"])
+        selected = None
+        try:
+            with self.app.suspend():
+                selected = select_file_dialog("DOCX Senaryo Dosyası Seçin", ["docx", "DOCX"])
+                if sys.platform == "win32":
+                    os.system("chcp 65001 >nul 2>&1")
+        except Exception:
+            selected = select_file_dialog("DOCX Senaryo Dosyası Seçin", ["docx", "DOCX"])
+
         if selected:
             docx_input = self.query_one("#docx-path", PathInput)
             docx_input.value = selected
             docx_input.focus()
             log = self.query_one("#log-area", RichLog)
             log.write(f"[bold green][OK] DOCX dosyası seçildi:[/bold green] {selected}")
+        self.app.refresh(repaint=True, layout=True)
 
     def action_browse_pdf(self) -> None:
         """Open native file chooser for PDF."""
-        selected = select_file_dialog("Referans PDF Dosyası Seçin", ["pdf", "PDF"])
+        selected = None
+        try:
+            with self.app.suspend():
+                selected = select_file_dialog("Referans PDF Dosyası Seçin", ["pdf", "PDF"])
+                if sys.platform == "win32":
+                    os.system("chcp 65001 >nul 2>&1")
+        except Exception:
+            selected = select_file_dialog("Referans PDF Dosyası Seçin", ["pdf", "PDF"])
+
         if selected:
             pdf_input = self.query_one("#pdf-path", PathInput)
             pdf_input.value = selected
             log = self.query_one("#log-area", RichLog)
             log.write(f"[bold cyan][OK] Referans PDF dosyası seçildi:[/bold cyan] {selected}")
+        self.app.refresh(repaint=True, layout=True)
 
     def action_clear(self) -> None:
         """Reset inputs and log area."""
@@ -520,6 +662,7 @@ class KastApp(App):
 
 def launch_tui() -> int:
     """Entry point to start the Kast Textual TUI."""
+    setup_windows_console()
     app = KastApp()
     app.run()
     return 0
