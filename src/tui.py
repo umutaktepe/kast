@@ -563,15 +563,7 @@ class KastApp(App):
 
     def action_browse_docx(self) -> None:
         """Open native file chooser for DOCX."""
-        selected = None
-        try:
-            with self.app.suspend():
-                selected = select_file_dialog("DOCX Senaryo Dosyası Seçin", ["docx", "DOCX"])
-                if sys.platform == "win32":
-                    os.system("chcp 65001 >nul 2>&1")
-        except Exception:
-            selected = select_file_dialog("DOCX Senaryo Dosyası Seçin", ["docx", "DOCX"])
-
+        selected = select_file_dialog("DOCX Senaryo Dosyası Seçin", ["docx", "DOCX"])
         if selected:
             docx_input = self.query_one("#docx-path", PathInput)
             docx_input.value = selected
@@ -582,15 +574,7 @@ class KastApp(App):
 
     def action_browse_pdf(self) -> None:
         """Open native file chooser for PDF."""
-        selected = None
-        try:
-            with self.app.suspend():
-                selected = select_file_dialog("Referans PDF Dosyası Seçin", ["pdf", "PDF"])
-                if sys.platform == "win32":
-                    os.system("chcp 65001 >nul 2>&1")
-        except Exception:
-            selected = select_file_dialog("Referans PDF Dosyası Seçin", ["pdf", "PDF"])
-
+        selected = select_file_dialog("Referans PDF Dosyası Seçin", ["pdf", "PDF"])
         if selected:
             pdf_input = self.query_one("#pdf-path", PathInput)
             pdf_input.value = selected
