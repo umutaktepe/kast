@@ -8,6 +8,25 @@ otomatik oluşturur ve Word dökümanına ekler veya ayrı dosya olarak kaydeder
 import argparse
 import os
 import sys
+
+# Proje sanal ortamını (.venv) veya kullanıcı paketlerini otomatik algıla
+try:
+    import docx
+except ImportError:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    venv_site = os.path.join(base_dir, ".venv", "lib")
+    if os.path.isdir(venv_site):
+        for py_dir in os.listdir(venv_site):
+            sp = os.path.join(venv_site, py_dir, "site-packages")
+            if os.path.isdir(sp) and sp not in sys.path:
+                sys.path.insert(0, sp)
+    user_site = os.path.expanduser("~/.local/lib")
+    if os.path.isdir(user_site):
+        for py_dir in os.listdir(user_site):
+            sp = os.path.join(user_site, py_dir, "site-packages")
+            if os.path.isdir(sp) and sp not in sys.path:
+                sys.path.insert(0, sp)
+
 from collections import OrderedDict
 from typing import List, Optional
 
