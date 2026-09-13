@@ -132,7 +132,7 @@ def test_header_bolding_and_styling():
         assert cell.vertical_alignment == WD_ALIGN_VERTICAL.CENTER
         p = cell.paragraphs[0]
         assert len(p.runs) > 0
-        assert p.runs[0].font.size == Pt(10)
+        assert p.runs[0].font.size == Pt(11)
         assert p.runs[0].font.name == "Arial"
 
 
@@ -244,4 +244,64 @@ def test_append_cast_table_without_page_break():
     assert len(doc.paragraphs) == 1  # Only the table heading paragraph
     assert doc.paragraphs[0].text == "KAST TABLOSU"
     assert len(doc.tables) == 1
+
+
+def test_detect_document_font_and_size():
+    """Verify font and size detection from document styles and runs."""
+    from src.table_writer import detect_document_font
+
+    doc = Document()
+    normal_style = doc.styles["Normal"]
+    normal_style.font.name = "Courier New"
+    normal_style.font.size = Pt(12)
+
+    p = doc.add_paragraph("Test paragraph in Courier New 12pt")
+    font_name, font_size = detect_document_font(doc)
+    assert font_name == "Courier New"
+    assert font_size == 12.0
+
+
+def test_table_inherits_document_font_and_size():
+    """Verify table cells inherit document's detected font and font size."""
+    doc = Document()
+    normal_style = doc.styles["Normal"]
+    normal_style.font.name = "Georgia"
+    normal_style.font.size = Pt(13)
+
+    doc.add_paragraph("Dialogue line sample")
+    char1 = CharacterStats(name="PETTY", first_seen_order=1)
+    char1.add_line(page=1)
+    result = CastExtractionResult(characters=[char1], total_lines=1, total_pages=1)
+
+    writer = CastTableWriter()
+    writer.append_cast_table(doc, result)
+
+    table = doc.tables[0]
+    # Data row cells
+    for cell in table.rows[1].cells:
+        p = cell.paragraphs[0]
+        assert p.runs[0].font.name == "Georgia"
+        assert p.runs[0].font.size == Pt(13)
+
+    # Header row cells
+    for cell in table.rows[0].cells:
+        p = cell.paragraphs[0]
+        assert p.runs[0].font.name == "Georgia"
+        assert p.runs[0].font.size == Pt(13)
+
+
+def test_table_writer_explicit_font_override():
+    """Verify explicit font and size overrides work when provided."""
+    doc = Document()
+    char1 = CharacterStats(name="PETTY", first_seen_order=1)
+    result = CastExtractionResult(characters=[char1], total_lines=1, total_pages=1)
+
+    writer = CastTableWriter(font_name="Calibri", font_size_pt=9.5)
+    writer.append_cast_table(doc, result)
+
+    table = doc.tables[0]
+    for cell in table.rows[1].cells:
+        p = cell.paragraphs[0]
+        assert p.runs[0].font.name == "Calibri"
+        assert p.runs[0].font.size == Pt(9.5)
 
