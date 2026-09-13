@@ -41,12 +41,13 @@ chmod +x install.sh && ./install.sh
 ```
 *Bu script sanal ortamı kurar, bağımlılıkları yükler ve `~/.local/bin/kast` sembolik bağını oluşturur. Artık terminalinizin herhangi bir yerinden sadece `kast` yazmanız yeterlidir.*
 
-### 🪟 Windows (PowerShell)
-```powershell
+### 🪟 Windows (CMD veya PowerShell)
+```cmd
 git clone https://github.com/umutaktepe/kast.git
 cd kast
-powershell -ExecutionPolicy Bypass -File .\install.ps1
+install.bat
 ```
+*(Veya doğrudan `install.bat` dosyasına çift tıklayabilir ya da PowerShell ile `powershell -ExecutionPolicy Bypass -File .\install.ps1` çalıştırabilirsiniz).*
 *Bu script sanal ortamı kurar, bağımlılıkları yükler, `%USERPROFILE%\bin\kast.cmd` başlatıcısını oluşturur ve Kullanıcı `PATH` ortam değişkenine otomatik ekler. Artık CMD veya PowerShell'de sadece `kast` yazmanız yeterlidir.*
 
 ### 🗑️ Programı Kaldırma (Uninstall)
@@ -55,9 +56,10 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
   ./uninstall.sh
   ```
 - **Windows:**
-  ```powershell
-  powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
+  ```cmd
+  uninstall.bat
   ```
+  *(veya `powershell -ExecutionPolicy Bypass -File .\uninstall.ps1`)*
 *Bu işlem terminal başlatıcısını sisteminizden temizler. Ardından klasörü silebilirsiniz.*
 
 ---
