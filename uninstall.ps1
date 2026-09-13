@@ -1,7 +1,7 @@
 # Kast 2.0 - Windows Kaldirma (Uninstall) Scripti
 # Kullanim: powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host "  Kast 2.0 -- Windows Kaldirma Scripti                " -ForegroundColor Cyan

@@ -1,7 +1,7 @@
 # Kast 2.0 - Windows PowerShell Kurulum Scripti
 # Kullanim: powershell -ExecutionPolicy Bypass -File .\install.ps1
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host "  Kast 2.0 -- Windows Kurulum ve Entegrasyon Scripti   " -ForegroundColor Cyan
@@ -40,13 +40,13 @@ if (-not (Test-Path $VenvPython)) {
 
 # 3. Bagimliliklarin yuklenmesi
 Write-Host "[*] Bagimliliklar kontrol ediliyor..." -ForegroundColor Cyan
-$CheckDeps = & $VenvPython -c "import docx, PIL, textual" 2>$null
+& $VenvPython -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(p) for p in ['docx', 'PIL', 'textual']) else 1)"
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[OK] Gerekli tum bagimliliklar zaten sanal ortamda mevcut." -ForegroundColor Green
 } else {
     Write-Host "[*] Eksik paketler yukleniyor (requirements.txt)..." -ForegroundColor Cyan
     $ReqFile = Join-Path $RepoDir "requirements.txt"
-    & $VenvPython -m pip install --quiet -r $ReqFile
+    & $VenvPython -m pip install -r $ReqFile
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[UYARI] pip ile paketler yuklenirken bir sorun olustu. Internet baglantinizi kontrol edin." -ForegroundColor Yellow
     } else {
