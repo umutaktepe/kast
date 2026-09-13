@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Dublaj Çevirisi Kast Çıkarma Sistemi (Kast 2.0).
 
 CLI ve kütüphane arayüzü: Dublaj DOCX senaryolarını okuyarak kast tablosunu
