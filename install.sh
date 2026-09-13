@@ -16,6 +16,15 @@ echo -e "${BLUE}======================================================${NC}"
 SOURCE_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 REPO_DIR="$(cd "$(dirname "$SOURCE_PATH")" && pwd)"
 
+# Sudo kontrolü (Kullanıcı alanına kurulum için sudo ile çalıştırılmamalıdır)
+if [ -n "${SUDO_USER:-}" ] && [ "${EUID:-$(id -u)}" -eq 0 ]; then
+    echo -e "${RED}[Hata] Bu kurulum scripti 'sudo' ile çalıştırılmamalıdır!${NC}" >&2
+    echo -e "Kast 2.0 kişisel kullanıcı dizininize (~/.local/bin) kurulur ve root yetkisi gerektirmez." >&2
+    echo -e "Lütfen normal kullanıcınızla şu şekilde çalıştırın:" >&2
+    echo -e "  ${YELLOW}./install.sh${NC}" >&2
+    exit 1
+fi
+
 # 1. Python 3 kontrolü
 if ! command -v python3 >/dev/null 2>&1; then
     echo -e "${RED}[Hata] Sistemde 'python3' bulunamadı.${NC}" >&2
