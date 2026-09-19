@@ -552,9 +552,10 @@ class DocumentPaginator:
             raise FileNotFoundError(f"PDF dosyası bulunamadı: {pdf_path}")
 
         def normalize(t: str) -> str:
-            # Boşluk, tire, tırnak normalizasyonu ve küçük harf
+            # Boşluk, tire, tırnak, kesme işareti normalizasyonu ve küçük harf
             t = t.replace("İ", "i").replace("I", "ı").lower()
             t = t.replace("–", "-").replace("—", "-").replace("“", '"').replace("”", '"')
+            t = t.replace("’", "'").replace("‘", "'")
             return " ".join(t.split())
 
         with pdfplumber.open(pdf_path) as pdf:

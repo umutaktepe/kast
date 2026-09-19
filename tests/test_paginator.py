@@ -392,7 +392,8 @@ def test_robust_pdf_matching_with_formatting_variations():
         ParsedParagraph(index=0, text="00.01", is_timecode=True),
         ParsedParagraph(index=1, text="JACKIE\t–   “MERHABA!”  Nasılsın?  ", speaker="JACKIE", dialogue="–   “MERHABA!”  Nasılsın?  "),
         ParsedParagraph(index=2, text="OOPJEN\t— IŞIKLAR   ve   İĞNELER. ", speaker="OOPJEN", dialogue="— IŞIKLAR   ve   İĞNELER. "),
-        ParsedParagraph(index=3, text="PETER\t- Normal metin. ", speaker="PETER", dialogue="- Normal metin. "),
+        ParsedParagraph(index=3, text="PETER\t- Jack’in don’t ‘hata’ yapma dediği. ", speaker="PETER", dialogue="- Jack’in don’t ‘hata’ yapma dediği. "),
+        ParsedParagraph(index=4, text="MARY\t- Normal metin. ", speaker="MARY", dialogue="- Normal metin. "),
     ]
 
     mock_pdf = MagicMock()
@@ -401,8 +402,10 @@ def test_robust_pdf_matching_with_formatting_variations():
     page2 = MagicMock()
     page2.extract_text.return_value = "OOPJEN  - ışıklar ve iğneler."
     page3 = MagicMock()
-    page3.extract_text.return_value = "PETER - Normal metin."
-    mock_pdf.pages = [page1, page2, page3]
+    page3.extract_text.return_value = "PETER - Jack'in don't 'hata' yapma dediği."
+    page4 = MagicMock()
+    page4.extract_text.return_value = "MARY - Normal metin."
+    mock_pdf.pages = [page1, page2, page3, page4]
     mock_pdf.__enter__.return_value = mock_pdf
 
     with patch("pdfplumber.open", return_value=mock_pdf), patch("os.path.exists", return_value=True):
@@ -411,9 +414,4 @@ def test_robust_pdf_matching_with_formatting_variations():
         assert assigned[1].page == 1
         assert assigned[2].page == 2
         assert assigned[3].page == 3
-
-
-
-
-
-
+        assert assigned[4].page == 4
