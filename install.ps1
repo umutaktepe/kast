@@ -40,7 +40,7 @@ if (-not (Test-Path $VenvPython)) {
 
 # 3. Bagimliliklarin yuklenmesi
 Write-Host "[*] Bagimliliklar kontrol ediliyor..." -ForegroundColor Cyan
-& $VenvPython -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(p) for p in ['docx', 'PIL', 'textual']) else 1)"
+& $VenvPython -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(p) for p in ['docx', 'PIL', 'textual', 'dxpdf']) else 1)"
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[OK] Gerekli tum bagimliliklar zaten sanal ortamda mevcut." -ForegroundColor Green
 } else {
