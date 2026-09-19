@@ -9,16 +9,16 @@ from PIL import ImageFont
 from src.parser import ParsedParagraph
 
 KNOWN_FONT_LINE_RATIOS: dict[str, float] = {
-    "verdana": 1.2153,
+    "verdana": 1.1606,
     "arial": 1.1172,
-    "calibri": 1.2207,
+    "calibri": 1.1500,
     "times new roman": 1.1074,
     "courier new": 1.1328,
-    "segoe ui": 1.2500,
-    "tahoma": 1.2065,
+    "segoe ui": 1.2000,
+    "tahoma": 1.1600,
     "georgia": 1.1406,
 }
-DEFAULT_FONT_LINE_RATIO = 1.18
+DEFAULT_FONT_LINE_RATIO = 1.15
 
 KNOWN_FONT_AVG_CHAR_WIDTHS: dict[str, float] = {
     "verdana": 0.60,

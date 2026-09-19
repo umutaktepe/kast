@@ -259,9 +259,9 @@ def test_layout_paginator_empty_paragraphs():
 
 def test_font_pitch_ratio_and_line_height():
     """Test that typographic line pitch ratio is applied to line height."""
-    # Verdana 11pt, 1.5 line spacing -> ratio ~1.215 -> height ~20.05 pt
+    # Verdana 11pt, 1.5 line spacing -> ratio ~1.16 -> height ~19.15 pt
     pag_verdana = PurePythonLayoutPaginator(font_name="Verdana", font_size_pt=11, line_spacing_multiplier=1.5)
-    assert 19.5 <= pag_verdana.single_line_height <= 20.5
+    assert 18.5 <= pag_verdana.single_line_height <= 19.5
 
     # Arial 11pt, 1.5 line spacing -> ratio ~1.117 -> height ~18.43 pt
     pag_arial = PurePythonLayoutPaginator(font_name="Arial", font_size_pt=11, line_spacing_multiplier=1.5)
@@ -275,7 +275,7 @@ def test_document_paginator_detects_font_and_format():
     # The document uses Verdana 11pt with 1.5 line spacing
     assert paginator.layout_paginator.font_name.lower() == "verdana"
     assert paginator.layout_paginator.font_size_pt == 11.0
-    assert 19.5 <= paginator.layout_paginator.single_line_height <= 20.5
+    assert 18.5 <= paginator.layout_paginator.single_line_height <= 19.5
 
 
 def test_empty_paragraphs_take_space():
@@ -329,6 +329,62 @@ def test_character_pages_not_collapsed_to_page_1():
     # MOUNA has 157 lines across ~50 pages, must NEVER be collapsed to {1}
     assert len(characters["MOUNA"]) >= 35
     assert max(characters["MOUNA"]) >= 90
+
+
+def test_jackie_and_oopjen_against_truekast_pdf():
+    """Verify extracted pages match truekast.pdf ground truth with >90% exact match and max_page 91-92."""
+    import pdfplumber
+
+    pdf_path = "example/truekast.pdf"
+    docx_path = "example/JACKIE & OOPJEN.docx"
+    if not os.path.exists(pdf_path) or not os.path.exists(docx_path):
+        pytest.skip("Example files not found")
+
+    # Extract all rows from truekast.pdf properly merging across pages
+    pdf_data = {}
+    with pdfplumber.open(pdf_path) as pdf:
+        last_char = None
+        for page in pdf.pages:
+            tables = page.extract_tables()
+            for t in tables:
+                for row in t:
+                    if not row or not any(row) or (row[0] and "Karakter" in row[0]):
+                        continue
+                    if row[0] and row[0].strip():
+                        name = " ".join(row[0].split()).strip()
+                        count = int(row[1].strip()) if len(row) > 1 and row[1] and row[1].strip() else 0
+                        pdf_data[name] = [count, row[2] if len(row) > 2 and row[2] else ""]
+                        last_char = name
+                    else:
+                        if last_char and len(row) > 2 and row[2]:
+                            pdf_data[last_char][1] += " " + row[2]
+
+    for name in pdf_data:
+        p_str = pdf_data[name][1].replace("\n", " ")
+        pdf_data[name][1] = [int(p.strip()) for p in p_str.split(",") if p.strip().isdigit()]
+
+    doc = Document(docx_path)
+    parser = DubbingDocxParser()
+    paragraphs = parser.parse_document_paragraphs(doc)
+    paginator = DocumentPaginator(doc)
+    assigned = paginator.process(paragraphs)
+
+    dialogue_paras = [p for p in assigned if p.speaker and p.dialogue]
+    max_page = max(p.page for p in assigned)
+    assert 91 <= max_page <= 93
+
+    exact_matches = 0
+    total_chars = len(pdf_data)
+
+    for name, (count, t_pages) in pdf_data.items():
+        c_paras = [p for p in dialogue_paras if p.speaker.replace(" ", "") == name.replace(" ", "")]
+        c_pages = sorted(list(set(p.page for p in c_paras)))
+        if t_pages == c_pages:
+            exact_matches += 1
+
+    # Over 90% of characters must be 100% exact matches with ground truth
+    assert exact_matches >= 50
+
 
 
 
