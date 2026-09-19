@@ -46,14 +46,16 @@ def convert_docx_to_pdf(docx_path: str, output_pdf_path: str) -> bool:
 
     # 1. Windows: Native Word COM via PowerShell
     if sys.platform == "win32":
+        ps_docx = abs_docx.replace("'", "''")
+        ps_pdf = abs_pdf.replace("'", "''")
         ps_script = f"""
 $ErrorActionPreference = 'Stop'
 try {{
     $word = New-Object -ComObject Word.Application
     $word.Visible = $false
     $word.DisplayAlerts = [Microsoft.Office.Interop.Word.WdAlertLevel]::wdAlertsNone
-    $doc = $word.Documents.Open('{abs_docx}', $false, $true)
-    $doc.SaveAs([ref]'{abs_pdf}', [ref]17)
+    $doc = $word.Documents.Open('{ps_docx}', $false, $true)
+    $doc.SaveAs([ref]'{ps_pdf}', [ref]17)
     $doc.Close([ref]$false)
     $word.Quit()
     exit 0
@@ -94,12 +96,13 @@ try {{
                 capture_output=True,
                 timeout=45,
             )
-            expected_lo_name = os.path.splitext(os.path.basename(abs_docx))[0] + ".pdf"
-            lo_output = os.path.join(out_dir, expected_lo_name)
-            if os.path.exists(lo_output):
-                if lo_output != abs_pdf:
-                    shutil.move(lo_output, abs_pdf)
-                return True
+            if res.returncode == 0:
+                expected_lo_name = os.path.splitext(os.path.basename(abs_docx))[0] + ".pdf"
+                lo_output = os.path.join(out_dir, expected_lo_name)
+                if os.path.exists(lo_output):
+                    if lo_output != abs_pdf:
+                        shutil.move(lo_output, abs_pdf)
+                    return True
         except Exception:
             pass
 

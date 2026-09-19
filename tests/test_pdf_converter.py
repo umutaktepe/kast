@@ -127,3 +127,41 @@ def test_temp_docx_to_pdf_raises_error_when_file_is_empty():
         with pytest.raises(PdfConversionError):
             with temp_docx_to_pdf("empty.docx") as _:
                 pass
+
+
+def test_convert_docx_to_pdf_powershell_path_escaping():
+    with patch("sys.platform", "win32"), \
+         patch("os.path.exists", return_value=True), \
+         patch("os.path.getsize", return_value=1024), \
+         patch("subprocess.run") as mock_run:
+
+        mock_run.return_value = MagicMock(returncode=0)
+        docx_path = r"C:\Users\John's Documents\my 'test' doc.docx"
+        pdf_path = r"C:\Users\John's Documents\my 'test' out.pdf"
+
+        result = convert_docx_to_pdf(docx_path, pdf_path)
+        assert result is True
+        mock_run.assert_called_once()
+
+        # Verify PowerShell command contains escaped single quotes
+        called_cmd = mock_run.call_args[0][0]
+        script_arg = called_cmd[4]  # ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script]
+        assert "John''s Documents" in script_arg
+        assert "my ''test'' doc.docx" in script_arg
+        assert "my ''test'' out.pdf" in script_arg
+
+
+def test_convert_docx_to_pdf_libreoffice_fails_on_nonzero_returncode():
+    mock_dxpdf = MagicMock()
+    mock_dxpdf.convert_file.side_effect = RuntimeError("dxpdf error")
+
+    with patch.dict("sys.modules", {"dxpdf": mock_dxpdf}), \
+         patch("sys.platform", "linux"), \
+         patch("os.path.exists", return_value=True), \
+         patch("shutil.which", return_value="/usr/bin/soffice"), \
+         patch("subprocess.run") as mock_run:
+
+        mock_run.return_value = MagicMock(returncode=1)
+        result = convert_docx_to_pdf("test.docx", "test.pdf")
+        assert result is False
+
