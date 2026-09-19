@@ -303,3 +303,32 @@ def test_pagination_on_jackie_and_oopjen_example():
     assert 90 <= max_page <= 96
 
 
+def test_character_pages_not_collapsed_to_page_1():
+    """Verify characters in a large document with sparse breaks appear across dozens of pages, not just 1."""
+    doc = Document("example/JACKIE & OOPJEN.docx")
+    parser = DubbingDocxParser()
+    paragraphs = parser.parse_document_paragraphs(doc)
+    paginator = DocumentPaginator(doc)
+    assigned = paginator.process(paragraphs)
+
+    characters = {}
+    for p in assigned:
+        if p.speaker and p.dialogue:
+            if p.speaker not in characters:
+                characters[p.speaker] = set()
+            characters[p.speaker].add(p.page)
+
+    # JACKIE has 318 lines across ~80 pages, must NEVER be collapsed to {1}
+    assert len(characters["JACKIE"]) >= 50
+    assert max(characters["JACKIE"]) >= 90
+
+    # OOPJEN has 249 lines across ~70 pages, must NEVER be collapsed to {1, 2}
+    assert len(characters["OOPJEN"]) >= 50
+    assert max(characters["OOPJEN"]) >= 90
+
+    # MOUNA has 157 lines across ~50 pages, must NEVER be collapsed to {1}
+    assert len(characters["MOUNA"]) >= 35
+    assert max(characters["MOUNA"]) >= 90
+
+
+

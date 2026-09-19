@@ -315,12 +315,45 @@ class PurePythonLayoutPaginator:
 
         return max(1, lines_count)
 
-    def paginate_paragraphs(self, paragraphs: List[ParsedParagraph]) -> List[ParsedParagraph]:
+    def paginate_paragraphs(
+        self,
+        paragraphs: List[ParsedParagraph],
+        doc: Optional[Document] = None,
+    ) -> List[ParsedParagraph]:
         """Paragraf listesini mizanpaj kurallarına göre sayfalara böler."""
+        doc_breaks: dict[int, Tuple[int, int]] = {}
+        if doc and hasattr(doc, "paragraphs"):
+            for doc_idx, doc_p in enumerate(doc.paragraphs):
+                p_elm = doc_p._element
+                before_breaks = len(
+                    p_elm.xpath(".//w:pPr/w:pageBreakBefore | .//w:lastRenderedPageBreak")
+                )
+                after_breaks = len(p_elm.xpath('.//w:r/w:br[@w:type="page"]'))
+                if before_breaks or after_breaks:
+                    doc_breaks[doc_idx] = (before_breaks, after_breaks)
+
         current_page = 1
         current_y = 0.0
+        last_idx = -1
 
         for p in paragraphs:
+            if doc_breaks:
+                # Breaks in unparsed paragraphs between last_idx and p.index
+                start_check = last_idx + 1 if last_idx >= 0 else p.index
+                for c_idx in range(start_check, p.index):
+                    if c_idx in doc_breaks:
+                        b_before, b_after = doc_breaks[c_idx]
+                        if b_before + b_after > 0 and current_y > 0:
+                            current_page += b_before + b_after
+                            current_y = 0.0
+
+                # Breaks before p.index itself
+                if p.index in doc_breaks:
+                    b_before, _ = doc_breaks[p.index]
+                    if b_before > 0 and current_y > 0:
+                        current_page += b_before
+                        current_y = 0.0
+
             # Paragraf yüksekliğini hesapla
             if getattr(p, "is_empty", False):
                 lines = 1
@@ -342,6 +375,15 @@ class PurePythonLayoutPaginator:
 
             p.page = current_page
             current_y += para_height
+
+            # Breaks after p.index itself
+            if doc_breaks and p.index in doc_breaks:
+                _, b_after = doc_breaks[p.index]
+                if b_after > 0:
+                    current_page += b_after
+                    current_y = 0.0
+
+            last_idx = p.index
 
         return paragraphs
 
@@ -415,21 +457,21 @@ class DocumentPaginator:
     ) -> List[ParsedParagraph]:
         """
         Paragraflara sayfa numaralarını atar.
-        Önce PDF (Tier 1), ardından XML sayfa sonları (Tier 2),
+        Önce PDF (Tier 1), ardından kapsamlı XML sayfa sonları (Tier 2),
         en son Saf Python mizanpaj motoru (Tier 3) kullanılır.
         """
         # Tier 1: Harici PDF verilmişse pdfplumber ile eşleştir
         if pdf_path:
             return self._process_with_pdf(paragraphs, pdf_path)
 
-        # Tier 2: XML soft / hard page break'leri varsa kullan
-        if self.doc and self._has_native_page_breaks(self.doc):
+        # Tier 2: Dökümanda Word tarafından üretilmiş kapsamlı XML soft page break'leri varsa kullan
+        if self.doc and self._has_comprehensive_soft_breaks(self.doc, len(paragraphs)):
             assigned = self._process_with_xml(paragraphs)
             if assigned and max((p.page for p in assigned), default=1) > 1:
                 return assigned
 
-        # Tier 3: Saf Python mizanpaj hesabı
-        return self.layout_paginator.paginate_paragraphs(paragraphs)
+        # Tier 3: Saf Python mizanpaj hesabı (varsa dökümandaki XML sayfa kesmelerini de dikkate alır)
+        return self.layout_paginator.paginate_paragraphs(paragraphs, doc=self.doc)
 
     @classmethod
     def assign_pages(
@@ -441,6 +483,21 @@ class DocumentPaginator:
         """Convenience method compatible with Paginator.assign_pages interface."""
         paginator = cls(doc=doc)
         return paginator.process(paragraphs=parsed_paragraphs, pdf_path=pdf_path)
+
+    def _has_comprehensive_soft_breaks(self, doc: Document, total_paragraphs: int) -> bool:
+        """
+        Dökümanda Word tarafından üretilmiş kapsamlı XML soft page break'leri
+        (w:lastRenderedPageBreak) olup olmadığını kontrol eder.
+        """
+        try:
+            soft_breaks = doc._element.xpath(".//w:lastRenderedPageBreak")
+            if not soft_breaks:
+                return False
+            if total_paragraphs <= 10:
+                return len(soft_breaks) >= 1
+            return (len(soft_breaks) >= (total_paragraphs / 45)) and (len(soft_breaks) >= 2)
+        except Exception:
+            return False
 
     def _has_native_page_breaks(self, doc: Document) -> bool:
         """Dökümanda XML tabanlı sayfa sonu etiketleri olup olmadığını kontrol eder."""
