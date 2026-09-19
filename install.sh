@@ -44,6 +44,26 @@ else
     echo -e "${GREEN}✓${NC} Mevcut sanal ortam (.venv) kullanılacak."
 fi
 
+# 2.5 LibreOffice Kontrolü ve Kurulumu
+echo -e "${BLUE}➜${NC} LibreOffice kontrol ediliyor..."
+if ! command -v soffice >/dev/null 2>&1 && ! command -v libreoffice >/dev/null 2>&1; then
+    echo -e "${YELLOW}[!] Sistemde LibreOffice bulunamadı.${NC}"
+    echo -e "${BLUE}➜${NC} %100 hassasiyetli sayfa tespiti için LibreOffice Writer kuruluyor..."
+    if command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y libreoffice-writer || echo -e "${YELLOW}[Uyarı] LibreOffice paketi kurulamadı. Lütfen manuel kurun.${NC}"
+    elif command -v apt-get >/dev/null 2>&1; then
+        (sudo apt-get update && sudo apt-get install -y libreoffice-writer) || echo -e "${YELLOW}[Uyarı] LibreOffice paketi kurulamadı. Lütfen manuel kurun.${NC}"
+    elif command -v pacman >/dev/null 2>&1; then
+        sudo pacman -S --noconfirm libreoffice-fresh || echo -e "${YELLOW}[Uyarı] LibreOffice paketi kurulamadı. Lütfen manuel kurun.${NC}"
+    elif command -v zypper >/dev/null 2>&1; then
+        sudo zypper install -y libreoffice-writer || echo -e "${YELLOW}[Uyarı] LibreOffice paketi kurulamadı. Lütfen manuel kurun.${NC}"
+    else
+        echo -e "${RED}[Uyarı] Paket yöneticisi otomatik tespit edilemedi. Lütfen 'libreoffice-writer' paketini manuel kurun.${NC}"
+    fi
+else
+    echo -e "${GREEN}✓${NC} LibreOffice tespit edildi."
+fi
+
 # 3. Bağımlılıkların yüklenmesi
 echo -e "${BLUE}➜${NC} Bağımlılıklar kontrol ediliyor..."
 if "$VENV_DIR/bin/python3" -c "import docx, PIL, textual" >/dev/null 2>&1; then

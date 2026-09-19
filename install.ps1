@@ -40,7 +40,7 @@ if (-not (Test-Path $VenvPython)) {
 
 # 3. Bagimliliklarin yuklenmesi
 Write-Host "[*] Bagimliliklar kontrol ediliyor..." -ForegroundColor Cyan
-& $VenvPython -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(p) for p in ['docx', 'PIL', 'textual', 'dxpdf']) else 1)"
+& $VenvPython -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(p) for p in ['docx', 'PIL', 'textual']) else 1)"
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[OK] Gerekli tum bagimliliklar zaten sanal ortamda mevcut." -ForegroundColor Green
 } else {
@@ -51,6 +51,54 @@ if ($LASTEXITCODE -eq 0) {
         Write-Host "[UYARI] pip ile paketler yuklenirken bir sorun olustu. Internet baglantinizi kontrol edin." -ForegroundColor Yellow
     } else {
         Write-Host "[OK] Bagimliliklar basariyla yuklendi." -ForegroundColor Green
+    }
+}
+
+# 3.5 LibreOffice / MS Word Kontrolu
+Write-Host "[*] LibreOffice / Microsoft Word sayfalama motoru kontrol ediliyor..." -ForegroundColor Cyan
+$WordFound = $false
+try {
+    $wordTest = New-Object -ComObject Word.Application -ErrorAction Stop
+    $wordTest.Quit()
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($wordTest) | Out-Null
+    $WordFound = $true
+} catch {
+    $WordFound = $false
+}
+
+$SofficeFound = $false
+if (Get-Command soffice.exe -ErrorAction SilentlyContinue) {
+    $SofficeFound = $true
+} else {
+    $CommonPaths = @(
+        "$env:ProgramFiles\LibreOffice\program\soffice.exe",
+        "${env:ProgramFiles(x86)}\LibreOffice\program\soffice.exe",
+        "$env:LOCALAPPDATA\Programs\LibreOffice\program\soffice.exe"
+    )
+    foreach ($p in $CommonPaths) {
+        if ($p -and (Test-Path $p)) {
+            $SofficeFound = $true
+            break
+        }
+    }
+}
+
+if ($WordFound) {
+    Write-Host "[OK] Microsoft Word (COM) tespit edildi." -ForegroundColor Green
+} elseif ($SofficeFound) {
+    Write-Host "[OK] LibreOffice tespit edildi." -ForegroundColor Green
+} else {
+    Write-Host "[!] Sistemde Microsoft Word veya LibreOffice bulunamadi." -ForegroundColor Yellow
+    Write-Host "[*] %100 hassasiyetli sayfa tespiti icin LibreOffice winget uzerinden kuruluyor..." -ForegroundColor Cyan
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        winget install --id TheDocumentFoundation.LibreOffice -e --silent --accept-package-agreements --accept-source-agreements
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[OK] LibreOffice basariyla kuruldu." -ForegroundColor Green
+        } else {
+            Write-Host "[UYARI] winget ile kurulum tamamlanamadi. Lutfen LibreOffice'i manuel kurun: https://www.libreoffice.org" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "[UYARI] winget bulunamadi. Lutfen %100 dogrulukta sayfalama icin LibreOffice'i manuel kurun: https://www.libreoffice.org" -ForegroundColor Yellow
     }
 }
 

@@ -282,7 +282,19 @@ def test_main_launches_tui_flag(monkeypatch):
     assert tui_called is True
 
 
-def test_pipeline_uses_temporary_pdf_and_cleans_up(tmp_path, capsys):
+@pytest.fixture
+def sample_dubbing_docx(tmp_path):
+    """Create a minimal hermetic dubbing script docx for testing."""
+    docx_file = tmp_path / "sample_dubbing_script.docx"
+    doc = Document()
+    doc.add_paragraph("FİLMİN ADI: TEST FILM")
+    doc.add_paragraph("[ALICE]\tHello Bob, how are you?")
+    doc.add_paragraph("[BOB]\tI am doing great Alice!")
+    doc.save(str(docx_file))
+    return str(docx_file)
+
+
+def test_pipeline_uses_temporary_pdf_and_cleans_up(tmp_path, capsys, sample_dubbing_docx):
     """Verify process_dubbing_script uses temporary PDF and guarantees 100% PDF path."""
     with patch("src.pdf_converter.temp_docx_to_pdf") as mock_temp_pdf, \
          patch("src.paginator.DocumentPaginator.process") as mock_process:
@@ -297,12 +309,10 @@ def test_pipeline_uses_temporary_pdf_and_cleans_up(tmp_path, capsys):
 
         from kast import process_dubbing_script
         out_path = str(tmp_path / "dummy_out.docx")
-        try:
-            process_dubbing_script("example/JACKIE & OOPJEN.docx", standalone=True, output_path=out_path)
-        except Exception:
-            pass
+        process_dubbing_script(sample_dubbing_docx, standalone=True, output_path=out_path)
 
         # Verify paginator was strictly called with the pdf_path
+        assert mock_temp_pdf.called
         assert mock_process.called
         call_kwargs = mock_process.call_args[1]
         assert call_kwargs.get("pdf_path") == "/tmp/fake_temp.pdf"
@@ -310,7 +320,7 @@ def test_pipeline_uses_temporary_pdf_and_cleans_up(tmp_path, capsys):
         assert "[+] Arka planda LibreOffice / Word ile geçici PDF üretiliyor..." in out
 
 
-def test_pipeline_uses_explicit_pdf_when_provided(tmp_path, capsys):
+def test_pipeline_uses_explicit_pdf_when_provided(tmp_path, capsys, sample_dubbing_docx):
     """Verify process_dubbing_script uses user-provided pdf_path directly without temp_docx_to_pdf."""
     with patch("src.pdf_converter.temp_docx_to_pdf") as mock_temp_pdf, \
          patch("src.paginator.DocumentPaginator.process") as mock_process:
@@ -319,15 +329,12 @@ def test_pipeline_uses_explicit_pdf_when_provided(tmp_path, capsys):
 
         from kast import process_dubbing_script
         out_path = str(tmp_path / "dummy_out.docx")
-        try:
-            process_dubbing_script(
-                "example/JACKIE & OOPJEN.docx",
-                pdf_path="custom_ref.pdf",
-                standalone=True,
-                output_path=out_path,
-            )
-        except Exception:
-            pass
+        process_dubbing_script(
+            sample_dubbing_docx,
+            pdf_path="custom_ref.pdf",
+            standalone=True,
+            output_path=out_path,
+        )
 
         assert not mock_temp_pdf.called
         assert mock_process.called
@@ -337,7 +344,7 @@ def test_pipeline_uses_explicit_pdf_when_provided(tmp_path, capsys):
         assert "[+] Verilen harici referans PDF doğrudan kullanılıyor: custom_ref.pdf" in out
 
 
-def test_pipeline_raises_conversion_error_without_fallback(tmp_path):
+def test_pipeline_raises_conversion_error_without_fallback(tmp_path, sample_dubbing_docx):
     """Verify PdfConversionError is not caught for fallback and is propagated."""
     from src.pdf_converter import PdfConversionError
 
@@ -354,20 +361,20 @@ def test_pipeline_raises_conversion_error_without_fallback(tmp_path):
         from kast import process_dubbing_script
         out_path = str(tmp_path / "dummy_out.docx")
         with pytest.raises(PdfConversionError):
-            process_dubbing_script("example/JACKIE & OOPJEN.docx", standalone=True, output_path=out_path)
+            process_dubbing_script(sample_dubbing_docx, standalone=True, output_path=out_path)
 
         assert not mock_process.called
 
 
-def test_pipeline_real_conversion_e2e(tmp_path):
-    """Verify real end-to-end processing of JACKIE & OOPJEN.docx with temporary PDF creation and cleanup."""
-    src_file = "example/JACKIE & OOPJEN.docx"
-    if not os.path.exists(src_file):
-        pytest.skip("Example file not found")
-
+def test_pipeline_real_conversion_e2e(tmp_path, sample_dubbing_docx):
+    """Verify real end-to-end processing with temporary PDF creation and cleanup."""
     from src.pdf_converter import is_pdf_conversion_supported
     if not is_pdf_conversion_supported():
         pytest.skip("LibreOffice or MS Word not installed on this system")
+
+    src_file = "example/JACKIE & OOPJEN.docx"
+    if not os.path.exists(src_file):
+        src_file = sample_dubbing_docx
 
     from kast import process_dubbing_script
 
@@ -378,8 +385,9 @@ def test_pipeline_real_conversion_e2e(tmp_path):
     doc = Document(result_path)
     assert len(doc.tables) >= 1
     table = doc.tables[0]
-    assert len(table.rows) > 5
+    assert len(table.rows) >= 2
     header_cells = [c.text for c in table.rows[0].cells]
     assert "Karakter" in header_cells[0]
+
 
 
