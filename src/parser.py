@@ -45,6 +45,7 @@ class ParsedParagraph:
     timecode: Optional[str] = None
     is_metadata: bool = False
     is_timecode: bool = False
+    is_empty: bool = False
     meta_key: Optional[str] = None
     meta_value: Optional[str] = None
     page: int = 1
@@ -134,7 +135,9 @@ class DubbingDocxParser:
                 return True, speaker_clean, dialogue
         return False, None, None
 
-    def parse_document_paragraphs(self, doc: Document) -> List[ParsedParagraph]:
+    def parse_document_paragraphs(
+        self, doc: Document, include_empty: bool = True
+    ) -> List[ParsedParagraph]:
         """Parse all paragraphs of a docx Document into ParsedParagraph structures."""
         parsed: List[ParsedParagraph] = []
         current_timecode: Optional[str] = None
@@ -142,6 +145,14 @@ class DubbingDocxParser:
         for idx, p in enumerate(doc.paragraphs):
             text = p.text.strip()
             if not text:
+                if include_empty:
+                    parsed.append(
+                        ParsedParagraph(
+                            index=idx,
+                            text="",
+                            is_empty=True,
+                        )
+                    )
                 continue
 
             # 1. Süre kodu kontrolü

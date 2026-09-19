@@ -26,7 +26,7 @@ def test_layout_paginator_initialization():
     assert paginator.printable_height == 648
     assert paginator.printable_width == 468
     assert paginator.dialogue_width == 360
-    assert paginator.single_line_height == 16.5  # 11 * 1.5
+    assert 18.0 <= paginator.single_line_height <= 19.0  # 11 * 1.1172 * 1.5
 
 
 def test_layout_paginator_advance_across_paragraphs():
@@ -255,4 +255,51 @@ def test_layout_paginator_empty_paragraphs():
     """Test paginate_paragraphs handles empty paragraph list."""
     paginator = PurePythonLayoutPaginator()
     assert paginator.paginate_paragraphs([]) == []
+
+
+def test_font_pitch_ratio_and_line_height():
+    """Test that typographic line pitch ratio is applied to line height."""
+    # Verdana 11pt, 1.5 line spacing -> ratio ~1.215 -> height ~20.05 pt
+    pag_verdana = PurePythonLayoutPaginator(font_name="Verdana", font_size_pt=11, line_spacing_multiplier=1.5)
+    assert 19.5 <= pag_verdana.single_line_height <= 20.5
+
+    # Arial 11pt, 1.5 line spacing -> ratio ~1.117 -> height ~18.43 pt
+    pag_arial = PurePythonLayoutPaginator(font_name="Arial", font_size_pt=11, line_spacing_multiplier=1.5)
+    assert 18.0 <= pag_arial.single_line_height <= 19.0
+
+
+def test_document_paginator_detects_font_and_format():
+    """Verify DocumentPaginator extracts font and paragraph format from doc."""
+    doc = Document("example/JACKIE & OOPJEN.docx")
+    paginator = DocumentPaginator(doc)
+    # The document uses Verdana 11pt with 1.5 line spacing
+    assert paginator.layout_paginator.font_name.lower() == "verdana"
+    assert paginator.layout_paginator.font_size_pt == 11.0
+    assert 19.5 <= paginator.layout_paginator.single_line_height <= 20.5
+
+
+def test_empty_paragraphs_take_space():
+    """Verify empty paragraphs take vertical height and advance pages."""
+    paginator = PurePythonLayoutPaginator(page_height_pt=792, top_margin_pt=72, bottom_margin_pt=72)
+    # Printable height: 648 pt. Empty paragraph height is ~30 pt.
+    # 25 empty paragraphs * 30 pt = 750 pt > 648 pt -> must advance to page 2!
+    paras = [ParsedParagraph(index=i, text="", is_empty=True) for i in range(25)]
+    assigned = paginator.paginate_paragraphs(paras)
+    assert assigned[0].page == 1
+    assert assigned[-1].page >= 2
+
+
+def test_pagination_on_jackie_and_oopjen_example():
+    """Test pagination on actual JACKIE & OOPJEN.docx script matches realistic Word pages (90-96)."""
+    doc = Document("example/JACKIE & OOPJEN.docx")
+    parser = DubbingDocxParser()
+    paragraphs = parser.parse_document_paragraphs(doc)
+    paginator = DocumentPaginator(doc)
+    assigned = paginator.process(paragraphs)
+
+    max_page = max(p.page for p in assigned)
+    # With true Word metrics (Verdana 11pt, 1.5 spacing, 10pt space after),
+    # 1846 paragraphs yield ~92-95 pages, NOT 82 pages!
+    assert 90 <= max_page <= 96
+
 

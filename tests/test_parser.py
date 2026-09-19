@@ -108,7 +108,7 @@ def test_parse_document_paragraphs_mock():
     doc.add_paragraph("Açıklama notu")
 
     parsed = parser.parse_document_paragraphs(doc)
-    assert len(parsed) == 7  # 2 headers + 2 timecodes + 2 dialogues + 1 plain text (empty skipped)
+    assert len(parsed) == 8  # 2 headers + 1 empty + 2 timecodes + 2 dialogues + 1 plain text
 
     # Header 1
     assert parsed[0].is_metadata is True
@@ -120,30 +120,33 @@ def test_parse_document_paragraphs_mock():
     assert parsed[1].meta_key == "ÇEVİRMEN"
     assert parsed[1].meta_value == "TEST ÇEVİRMEN"
 
-    # Timecode 1
-    assert parsed[2].is_timecode is True
-    assert parsed[2].timecode == "01.00"
+    # Empty paragraph
+    assert parsed[2].is_empty is True
 
-    # Dialogue 1
-    assert parsed[3].speaker == "CHAR A"
-    assert parsed[3].dialogue == "- İlk replik."
+    # Timecode 1
+    assert parsed[3].is_timecode is True
     assert parsed[3].timecode == "01.00"
 
-    # Timecode 2
-    assert parsed[4].is_timecode is True
-    assert parsed[4].timecode == "01.05"
+    # Dialogue 1
+    assert parsed[4].speaker == "CHAR A"
+    assert parsed[4].dialogue == "- İlk replik."
+    assert parsed[4].timecode == "01.00"
 
-    # Dialogue 2
-    assert parsed[5].speaker == "CHAR B"
-    assert parsed[5].dialogue == "- İkinci replik."
+    # Timecode 2
+    assert parsed[5].is_timecode is True
     assert parsed[5].timecode == "01.05"
 
+    # Dialogue 2
+    assert parsed[6].speaker == "CHAR B"
+    assert parsed[6].dialogue == "- İkinci replik."
+    assert parsed[6].timecode == "01.05"
+
     # Plain text paragraph
-    assert parsed[6].text == "Açıklama notu"
-    assert parsed[6].speaker is None
-    assert parsed[6].dialogue is None
-    assert parsed[6].is_metadata is False
-    assert parsed[6].is_timecode is False
+    assert parsed[7].text == "Açıklama notu"
+    assert parsed[7].speaker is None
+    assert parsed[7].dialogue is None
+    assert parsed[7].is_metadata is False
+    assert parsed[7].is_timecode is False
 
 
 def test_parsed_paragraph_to_dialogue_line():
