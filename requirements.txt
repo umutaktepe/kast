@@ -4,4 +4,3 @@ pdfplumber>=0.10.0
 pytest>=8.0.0
 textual>=0.80.0
 pytest-asyncio>=0.23.0
-dxpdf>=0.8.0
