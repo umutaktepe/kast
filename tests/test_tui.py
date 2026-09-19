@@ -72,9 +72,23 @@ async def test_tui_extract_empty_path_shows_error():
         assert "Lütfen geçerli bir .docx dosyası belirtin" in combined or "Hata" in combined
 
 
+MINIMAL_PDF_BYTES = (
+    b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+    b"2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n"
+    b"3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\n"
+    b"xref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000052 00000 n \n0000000101 00000 n \n"
+    b"trailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF\n"
+)
+
+
 @pytest.mark.asyncio
 async def test_tui_successful_extraction(tmp_path):
-    """Verify successful extraction end-to-end through TUI."""
+    """Verify successful extraction end-to-end through TUI with background PDF conversion."""
+    import tempfile
+    from contextlib import contextmanager
+    from unittest.mock import patch
+    from src.pdf_converter import is_pdf_conversion_supported
+
     # Create a small script docx
     test_docx = tmp_path / "sample_script.docx"
     doc = Document()
@@ -85,14 +99,38 @@ async def test_tui_successful_extraction(tmp_path):
     doc.add_paragraph("BOB\t- Selam Alice!")
     doc.save(str(test_docx))
 
+    @contextmanager
+    def fake_temp_pdf(docx_path):
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+            f.write(MINIMAL_PDF_BYTES)
+            temp_name = f.name
+        try:
+            yield temp_name
+        finally:
+            if os.path.exists(temp_name):
+                os.remove(temp_name)
+
     app = KastApp()
     async with app.run_test() as pilot:
         # Input path with enclosing quotes (simulating drag & drop)
         docx_input = app.query_one("#docx-path")
         docx_input.value = f"'{test_docx}'"
 
-        app.query_one("#btn-extract", Button).action_press()
-        await pilot.pause()
+        patcher = None
+        if not is_pdf_conversion_supported():
+            patcher = patch("src.pdf_converter.temp_docx_to_pdf", side_effect=fake_temp_pdf)
+            patcher.start()
+
+        try:
+            app.query_one("#btn-extract", Button).action_press()
+            await pilot.pause()
+        finally:
+            if patcher:
+                patcher.stop()
+
+        log_area = app.query_one("#log-area")
+        combined_logs = " ".join(line.text for line in log_area.lines)
+        assert "Arka planda LibreOffice/Word motoru ile PDF üretiliyor..." in combined_logs
 
         expected_output = tmp_path / "sample_script_kast.docx"
         assert os.path.exists(expected_output)
@@ -101,6 +139,50 @@ async def test_tui_successful_extraction(tmp_path):
         assert len(out_doc.tables) == 1
         table = out_doc.tables[0]
         assert len(table.rows) == 3  # Header + ALICE + BOB
+
+
+@pytest.mark.asyncio
+async def test_tui_successful_extraction_with_direct_pdf(tmp_path):
+    """Verify successful extraction through TUI using directly provided reference PDF."""
+    from unittest.mock import patch
+
+    # Create a small script docx
+    test_docx = tmp_path / "sample_script_direct.docx"
+    doc = Document()
+    doc.add_paragraph("FİLMİN ADI\tDENEME")
+    doc.add_paragraph("ÇEVİRMEN\tTEST")
+    doc.add_paragraph("00.10")
+    doc.add_paragraph("ALICE\t- Merhaba dünya!")
+    doc.add_paragraph("BOB\t- Selam Alice!")
+    doc.save(str(test_docx))
+
+    # Create reference PDF
+    test_pdf = tmp_path / "sample_ref.pdf"
+    test_pdf.write_bytes(MINIMAL_PDF_BYTES)
+
+    app = KastApp()
+    async with app.run_test() as pilot:
+        docx_input = app.query_one("#docx-path")
+        docx_input.value = str(test_docx)
+        pdf_input = app.query_one("#pdf-path")
+        pdf_input.value = str(test_pdf)
+
+        with patch("src.pdf_converter.temp_docx_to_pdf") as mock_temp_pdf:
+            app.query_one("#btn-extract", Button).action_press()
+            await pilot.pause()
+            assert not mock_temp_pdf.called
+
+        log_area = app.query_one("#log-area")
+        combined_logs = " ".join(line.text for line in log_area.lines)
+        assert "Harici Referans PDF devrede (Doğrudan İşleniyor): sample_ref.pdf" in combined_logs
+
+        expected_output = tmp_path / "sample_script_direct_kast.docx"
+        assert os.path.exists(expected_output)
+
+        out_doc = Document(str(expected_output))
+        assert len(out_doc.tables) == 1
+        table = out_doc.tables[0]
+        assert len(table.rows) == 3
 
 
 def test_clean_drag_drop_path():

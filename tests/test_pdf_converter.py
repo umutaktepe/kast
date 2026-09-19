@@ -75,6 +75,7 @@ def test_convert_docx_to_pdf_executes_libreoffice():
     with patch("sys.platform", "linux"), \
          patch("os.path.exists", side_effect=mock_exists), \
          patch("os.path.getsize", return_value=1024), \
+         patch("shutil.move") as mock_move, \
          patch("src.pdf_converter.find_soffice_binary", return_value="/usr/bin/soffice"), \
          patch("subprocess.run") as mock_run:
 
@@ -87,6 +88,11 @@ def test_convert_docx_to_pdf_executes_libreoffice():
         assert "--headless" in cmd
         assert "--convert-to" in cmd
         assert "pdf" in cmd
+        assert "--outdir" in cmd
+        # Verify outdir is an isolated temp dir, not the parent dir of test.pdf
+        outdir_idx = cmd.index("--outdir")
+        assert cmd[outdir_idx + 1] != "."
+        mock_move.assert_called_once()
 
 
 def test_convert_docx_to_pdf_windows_fallback_to_libreoffice():
@@ -101,6 +107,7 @@ def test_convert_docx_to_pdf_windows_fallback_to_libreoffice():
     with patch("sys.platform", "win32"), \
          patch("os.path.exists", side_effect=mock_exists), \
          patch("os.path.getsize", return_value=1024), \
+         patch("shutil.move") as mock_move, \
          patch("src.pdf_converter.find_soffice_binary", return_value=r"C:\Program Files\LibreOffice\program\soffice.exe"), \
          patch("subprocess.run") as mock_run:
 
@@ -112,9 +119,13 @@ def test_convert_docx_to_pdf_windows_fallback_to_libreoffice():
         result = convert_docx_to_pdf("test.docx", "test.pdf")
         assert result is True
         assert mock_run.call_count == 2
-        soffice_cmd = mock_run.call_args_list[1][0][0]
+        soffice_call = mock_run.call_args_list[1]
+        soffice_cmd = soffice_call[0][0]
         assert soffice_cmd[0] == r"C:\Program Files\LibreOffice\program\soffice.exe"
         assert "--headless" in soffice_cmd
+        # Verify creationflags is passed on Windows
+        assert soffice_call[1].get("creationflags") == 0x08000000
+        mock_move.assert_called_once()
 
 
 def test_convert_docx_to_pdf_powershell_path_escaping():

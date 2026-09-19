@@ -630,7 +630,10 @@ class KastApp(App):
 
         log.write(f"\n[bold blue][*] İşlem başlatılıyor:[/bold blue] {docx_path}")
         log.write(f"    Sıralama: [magenta]{sort_by}[/magenta] | In-Place: {in_place} | Standalone: {standalone}")
-        log.write("[bold cyan][*] Sayfalar %100 hassasiyetle hesaplanıyor...[/bold cyan]")
+        if pdf_path:
+            log.write(f"[bold green][*] Harici Referans PDF devrede (Doğrudan İşleniyor):[/bold green] {os.path.basename(pdf_path)}")
+        else:
+            log.write("[bold cyan][*] Arka planda LibreOffice/Word motoru ile PDF üretiliyor...[/bold cyan]")
 
         try:
             saved_file = process_dubbing_script(

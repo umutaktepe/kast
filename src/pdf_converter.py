@@ -101,20 +101,23 @@ try {{
     # 2. LibreOffice / soffice (Linux/macOS/Windows fallback)
     soffice_cmd = find_soffice_binary()
     if soffice_cmd:
-        out_dir = os.path.dirname(abs_pdf) or "."
         try:
-            res = subprocess.run(
-                [soffice_cmd, "--headless", "--convert-to", "pdf", abs_docx, "--outdir", out_dir],
-                capture_output=True,
-                timeout=45,
-            )
-            if res.returncode == 0:
-                expected_lo_name = os.path.splitext(os.path.basename(abs_docx))[0] + ".pdf"
-                lo_output = os.path.join(out_dir, expected_lo_name)
-                if os.path.exists(lo_output) and os.path.getsize(lo_output) > 0:
-                    if lo_output != abs_pdf:
+            with tempfile.TemporaryDirectory() as lo_temp_dir:
+                kwargs = {}
+                if sys.platform == "win32":
+                    kwargs["creationflags"] = 0x08000000
+                res = subprocess.run(
+                    [soffice_cmd, "--headless", "--convert-to", "pdf", abs_docx, "--outdir", lo_temp_dir],
+                    capture_output=True,
+                    timeout=45,
+                    **kwargs,
+                )
+                if res.returncode == 0:
+                    expected_lo_name = os.path.splitext(os.path.basename(abs_docx))[0] + ".pdf"
+                    lo_output = os.path.join(lo_temp_dir, expected_lo_name)
+                    if os.path.exists(lo_output) and os.path.getsize(lo_output) > 0:
                         shutil.move(lo_output, abs_pdf)
-                    return True
+                        return True
         except Exception:
             pass
 

@@ -79,9 +79,11 @@ def process_cast_document(
 
     if pdf_path:
         # Kullanıcı elle harici PDF verdiyse doğrudan onu kullan
+        print(f"[+] Verilen harici referans PDF doğrudan kullanılıyor: {pdf_path}")
         assigned_paras = paginator.process(parsed_paras, pdf_path=pdf_path)
     else:
         # Arka planda geçici PDF oluştur (%100 garanti - fallback yok)
+        print("[+] Arka planda LibreOffice / Word ile geçici PDF üretiliyor...")
         with pdf_converter.temp_docx_to_pdf(docx_path) as temp_pdf:
             print("[+] Arka planda geçici PDF üretildi, %100 sayfa hassasiyeti devrede.")
             assigned_paras = paginator.process(parsed_paras, pdf_path=temp_pdf)

@@ -282,7 +282,7 @@ def test_main_launches_tui_flag(monkeypatch):
     assert tui_called is True
 
 
-def test_pipeline_uses_temporary_pdf_and_cleans_up(tmp_path):
+def test_pipeline_uses_temporary_pdf_and_cleans_up(tmp_path, capsys):
     """Verify process_dubbing_script uses temporary PDF and guarantees 100% PDF path."""
     with patch("src.pdf_converter.temp_docx_to_pdf") as mock_temp_pdf, \
          patch("src.paginator.DocumentPaginator.process") as mock_process:
@@ -306,9 +306,11 @@ def test_pipeline_uses_temporary_pdf_and_cleans_up(tmp_path):
         assert mock_process.called
         call_kwargs = mock_process.call_args[1]
         assert call_kwargs.get("pdf_path") == "/tmp/fake_temp.pdf"
+        out = capsys.readouterr().out
+        assert "[+] Arka planda LibreOffice / Word ile geçici PDF üretiliyor..." in out
 
 
-def test_pipeline_uses_explicit_pdf_when_provided(tmp_path):
+def test_pipeline_uses_explicit_pdf_when_provided(tmp_path, capsys):
     """Verify process_dubbing_script uses user-provided pdf_path directly without temp_docx_to_pdf."""
     with patch("src.pdf_converter.temp_docx_to_pdf") as mock_temp_pdf, \
          patch("src.paginator.DocumentPaginator.process") as mock_process:
@@ -331,6 +333,8 @@ def test_pipeline_uses_explicit_pdf_when_provided(tmp_path):
         assert mock_process.called
         call_kwargs = mock_process.call_args[1]
         assert call_kwargs.get("pdf_path") == "custom_ref.pdf"
+        out = capsys.readouterr().out
+        assert "[+] Verilen harici referans PDF doğrudan kullanılıyor: custom_ref.pdf" in out
 
 
 def test_pipeline_raises_conversion_error_without_fallback(tmp_path):
@@ -360,6 +364,10 @@ def test_pipeline_real_conversion_e2e(tmp_path):
     src_file = "example/JACKIE & OOPJEN.docx"
     if not os.path.exists(src_file):
         pytest.skip("Example file not found")
+
+    from src.pdf_converter import is_pdf_conversion_supported
+    if not is_pdf_conversion_supported():
+        pytest.skip("LibreOffice or MS Word not installed on this system")
 
     from kast import process_dubbing_script
 
