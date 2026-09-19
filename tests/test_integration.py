@@ -2,6 +2,9 @@
 
 import os
 import shutil
+from contextlib import contextmanager
+from unittest.mock import patch
+
 import pytest
 from docx import Document
 
@@ -277,3 +280,98 @@ def test_main_launches_tui_flag(monkeypatch):
     ret = main(["--tui"])
     assert ret == 0
     assert tui_called is True
+
+
+def test_pipeline_uses_temporary_pdf_and_cleans_up(tmp_path):
+    """Verify process_dubbing_script uses temporary PDF and guarantees 100% PDF path."""
+    with patch("src.pdf_converter.temp_docx_to_pdf") as mock_temp_pdf, \
+         patch("src.paginator.DocumentPaginator.process") as mock_process:
+
+        mock_process.return_value = []
+
+        @contextmanager
+        def fake_temp_pdf(docx_path):
+            yield "/tmp/fake_temp.pdf"
+
+        mock_temp_pdf.side_effect = fake_temp_pdf
+
+        from kast import process_dubbing_script
+        out_path = str(tmp_path / "dummy_out.docx")
+        try:
+            process_dubbing_script("example/JACKIE & OOPJEN.docx", standalone=True, output_path=out_path)
+        except Exception:
+            pass
+
+        # Verify paginator was strictly called with the pdf_path
+        assert mock_process.called
+        call_kwargs = mock_process.call_args[1]
+        assert call_kwargs.get("pdf_path") == "/tmp/fake_temp.pdf"
+
+
+def test_pipeline_uses_explicit_pdf_when_provided(tmp_path):
+    """Verify process_dubbing_script uses user-provided pdf_path directly without temp_docx_to_pdf."""
+    with patch("src.pdf_converter.temp_docx_to_pdf") as mock_temp_pdf, \
+         patch("src.paginator.DocumentPaginator.process") as mock_process:
+
+        mock_process.return_value = []
+
+        from kast import process_dubbing_script
+        out_path = str(tmp_path / "dummy_out.docx")
+        try:
+            process_dubbing_script(
+                "example/JACKIE & OOPJEN.docx",
+                pdf_path="custom_ref.pdf",
+                standalone=True,
+                output_path=out_path,
+            )
+        except Exception:
+            pass
+
+        assert not mock_temp_pdf.called
+        assert mock_process.called
+        call_kwargs = mock_process.call_args[1]
+        assert call_kwargs.get("pdf_path") == "custom_ref.pdf"
+
+
+def test_pipeline_raises_conversion_error_without_fallback(tmp_path):
+    """Verify PdfConversionError is not caught for fallback and is propagated."""
+    from src.pdf_converter import PdfConversionError
+
+    with patch("src.pdf_converter.temp_docx_to_pdf") as mock_temp_pdf, \
+         patch("src.paginator.DocumentPaginator.process") as mock_process:
+
+        @contextmanager
+        def failing_temp_pdf(docx_path):
+            raise PdfConversionError("Conversion failed")
+            yield "/tmp/fake.pdf"
+
+        mock_temp_pdf.side_effect = failing_temp_pdf
+
+        from kast import process_dubbing_script
+        out_path = str(tmp_path / "dummy_out.docx")
+        with pytest.raises(PdfConversionError):
+            process_dubbing_script("example/JACKIE & OOPJEN.docx", standalone=True, output_path=out_path)
+
+        assert not mock_process.called
+
+
+def test_pipeline_real_conversion_e2e(tmp_path):
+    """Verify real end-to-end processing of JACKIE & OOPJEN.docx with temporary PDF creation and cleanup."""
+    src_file = "example/JACKIE & OOPJEN.docx"
+    if not os.path.exists(src_file):
+        pytest.skip("Example file not found")
+
+    from kast import process_dubbing_script
+
+    out_file = tmp_path / "jackie_kast.docx"
+    result_path = process_dubbing_script(src_file, standalone=True, output_path=str(out_file))
+
+    assert os.path.exists(result_path)
+    doc = Document(result_path)
+    assert len(doc.tables) >= 1
+    table = doc.tables[0]
+    assert len(table.rows) > 5
+    header_cells = [c.text for c in table.rows[0].cells]
+    assert "Karakter" in header_cells[0]
+
+

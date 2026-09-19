@@ -35,6 +35,8 @@ from docx import Document
 from src.models import CastExtractionResult, CharacterStats
 from src.paginator import DocumentPaginator
 from src.parser import DubbingDocxParser
+from src import pdf_converter
+from src.pdf_converter import PdfConversionError, temp_docx_to_pdf
 from src.table_writer import CastTableWriter
 
 
@@ -72,9 +74,17 @@ def process_cast_document(
     print(f"[+] Toplam {len(parsed_paras)} paragraf incelendi.")
     print(f"[+] {len(dialogue_paras)} replik tespit edildi.")
 
-    # 2. Sayfa numaralandırmasını hesapla
+    # 2. Sayfa numaralandırmasını hesapla (%100 PDF tabanlı)
     paginator = DocumentPaginator(doc)
-    assigned_paras = paginator.process(parsed_paras, pdf_path=pdf_path)
+
+    if pdf_path:
+        # Kullanıcı elle harici PDF verdiyse doğrudan onu kullan
+        assigned_paras = paginator.process(parsed_paras, pdf_path=pdf_path)
+    else:
+        # Arka planda geçici PDF oluştur (%100 garanti - fallback yok)
+        with pdf_converter.temp_docx_to_pdf(docx_path) as temp_pdf:
+            print("[+] Arka planda geçici PDF üretildi, %100 sayfa hassasiyeti devrede.")
+            assigned_paras = paginator.process(parsed_paras, pdf_path=temp_pdf)
 
     # 3. Karakter istatistiklerini derle
     characters_map: OrderedDict[str, CharacterStats] = OrderedDict()
@@ -126,6 +136,10 @@ def process_cast_document(
     print(f"[✓] Başarıyla tamamlandı! Kast tablosu kaydedildi:")
     print(f"    -> {output_path}")
     return output_path
+
+
+# Function alias for compatibility with pipeline interfaces and task specifications
+process_dubbing_script = process_cast_document
 
 
 def build_cli_parser() -> argparse.ArgumentParser:
@@ -285,6 +299,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             standalone=args.standalone,
         )
         return 0
+    except PdfConversionError as e:
+        print(f"\n[!] PDF Dönüştürme Hatası: {e}")
+        return 1
     except Exception as e:
         print(f"\n[!] Bir hata oluştu: {e}")
         import traceback

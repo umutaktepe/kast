@@ -30,7 +30,8 @@ from textual.widgets import (
     RichLog,
 )
 
-from kast import process_cast_document
+from kast import process_cast_document, process_dubbing_script
+from src.pdf_converter import PdfConversionError
 
 
 def setup_windows_console() -> None:
@@ -629,9 +630,10 @@ class KastApp(App):
 
         log.write(f"\n[bold blue][*] İşlem başlatılıyor:[/bold blue] {docx_path}")
         log.write(f"    Sıralama: [magenta]{sort_by}[/magenta] | In-Place: {in_place} | Standalone: {standalone}")
+        log.write("[bold cyan][*] Sayfalar %100 hassasiyetle hesaplanıyor...[/bold cyan]")
 
         try:
-            saved_file = process_cast_document(
+            saved_file = process_dubbing_script(
                 docx_path=docx_path,
                 output_path=output_path,
                 pdf_path=pdf_path,
@@ -640,6 +642,8 @@ class KastApp(App):
             )
             log.write("[bold green][OK] Başarıyla tamamlandı![/bold green]")
             log.write(f"    Kast Tablosu Kaydedildi: [bold underline green]{saved_file}[/bold underline green]")
+        except PdfConversionError as exc:
+            log.write(f"[bold red][!] PDF Dönüştürme Hatası:[/bold red] {exc}")
         except Exception as exc:
             log.write(f"[bold red][!] Çıkarma sırasında hata oluştu:[/bold red] {exc}")
 

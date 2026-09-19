@@ -299,4 +299,30 @@ def test_setup_windows_console_does_not_crash():
     setup_windows_console()
 
 
+@pytest.mark.asyncio
+async def test_tui_pdf_conversion_error_handling(tmp_path, monkeypatch):
+    """Verify TUI cleanly reports PdfConversionError to log area."""
+    from unittest.mock import patch
+    from src.pdf_converter import PdfConversionError
+
+    test_docx = tmp_path / "failing_script.docx"
+    test_docx.write_text("dummy")
+
+    app = KastApp()
+    async with app.run_test() as pilot:
+        docx_input = app.query_one("#docx-path")
+        docx_input.value = str(test_docx)
+
+        with patch("src.tui.process_dubbing_script", side_effect=PdfConversionError("Dönüşüm başarısız oldu")):
+            app.query_one("#btn-extract", Button).action_press()
+            await pilot.pause()
+
+        log_area = app.query_one("#log-area")
+        lines = [line.text for line in log_area.lines]
+        combined = " ".join(lines)
+        assert "PDF Dönüştürme Hatası" in combined
+        assert "Dönüşüm başarısız oldu" in combined
+
+
+
 
