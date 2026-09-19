@@ -386,5 +386,34 @@ def test_jackie_and_oopjen_against_truekast_pdf():
     assert exact_matches >= 50
 
 
+def test_robust_pdf_matching_with_formatting_variations():
+    """Verify _process_with_pdf handles whitespace, punctuation, and Turkish characters."""
+    paragraphs = [
+        ParsedParagraph(index=0, text="00.01", is_timecode=True),
+        ParsedParagraph(index=1, text="JACKIE\t–   “MERHABA!”  Nasılsın?  ", speaker="JACKIE", dialogue="–   “MERHABA!”  Nasılsın?  "),
+        ParsedParagraph(index=2, text="OOPJEN\t— IŞIKLAR   ve   İĞNELER. ", speaker="OOPJEN", dialogue="— IŞIKLAR   ve   İĞNELER. "),
+        ParsedParagraph(index=3, text="PETER\t- Normal metin. ", speaker="PETER", dialogue="- Normal metin. "),
+    ]
+
+    mock_pdf = MagicMock()
+    page1 = MagicMock()
+    page1.extract_text.return_value = "00.01\nJACKIE  - \"merhaba!\" Nasılsın?"
+    page2 = MagicMock()
+    page2.extract_text.return_value = "OOPJEN  - ışıklar ve iğneler."
+    page3 = MagicMock()
+    page3.extract_text.return_value = "PETER - Normal metin."
+    mock_pdf.pages = [page1, page2, page3]
+    mock_pdf.__enter__.return_value = mock_pdf
+
+    with patch("pdfplumber.open", return_value=mock_pdf), patch("os.path.exists", return_value=True):
+        paginator = DocumentPaginator()
+        assigned = paginator.process(paragraphs, pdf_path="dummy.pdf")
+        assert assigned[1].page == 1
+        assert assigned[2].page == 2
+        assert assigned[3].page == 3
+
+
+
+
 
 

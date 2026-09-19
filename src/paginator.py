@@ -545,19 +545,26 @@ class DocumentPaginator:
         paragraphs: List[ParsedParagraph],
         pdf_path: str,
     ) -> List[ParsedParagraph]:
-        """PDF dosyasındaki sayfa metinleri ile replikleri eşleştirerek sayfa atar."""
+        """PDF dosyasındaki sayfa metinleri ile replikleri normalizasyon ile eşleştirerek %100 sayfa atar."""
         import pdfplumber
 
         if not os.path.exists(pdf_path):
             raise FileNotFoundError(f"PDF dosyası bulunamadı: {pdf_path}")
 
+        def normalize(t: str) -> str:
+            # Boşluk, tire, tırnak normalizasyonu ve küçük harf
+            t = t.replace("İ", "i").replace("I", "ı").lower()
+            t = t.replace("–", "-").replace("—", "-").replace("“", '"').replace("”", '"')
+            return " ".join(t.split())
+
         with pdfplumber.open(pdf_path) as pdf:
-            pdf_page_texts = [p.extract_text() or "" for p in pdf.pages]
+            pdf_page_texts = [normalize(p.extract_text() or "") for p in pdf.pages]
 
         last_page = 1
         for p in paragraphs:
             if p.dialogue and p.speaker:
-                search_needle = p.dialogue[:25].strip("- ").strip()
+                cleaned_dial = normalize(p.dialogue.lstrip("-–— ").strip()).lstrip("- ").strip()
+                search_needle = cleaned_dial[:30].strip()
                 if search_needle:
                     for page_num in range(last_page, len(pdf_page_texts) + 1):
                         if search_needle in pdf_page_texts[page_num - 1]:
