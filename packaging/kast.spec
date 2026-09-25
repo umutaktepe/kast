@@ -4,7 +4,12 @@
 import os
 import sys
 
-SPECPATH = globals().get("SPECPATH", os.path.abspath(os.path.dirname(__file__)))
+try:
+    spec_dir = SPECPATH
+except NameError:
+    spec_dir = os.path.abspath(os.path.dirname(__file__)) if "__file__" in globals() else os.getcwd()
+
+SPECPATH = spec_dir
 ROOT_DIR = os.path.abspath(os.path.join(SPECPATH, ".."))
 
 block_cipher = None
