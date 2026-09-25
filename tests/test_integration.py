@@ -282,6 +282,39 @@ def test_main_launches_tui_flag(monkeypatch):
     assert tui_called is True
 
 
+def test_cli_gui_flag_parsing():
+    """Verify --gui and -g argument parsing."""
+    parser = build_cli_parser()
+    args_long = parser.parse_args(["--gui"])
+    assert args_long.gui_mode is True
+
+    args_short = parser.parse_args(["-g"])
+    assert args_short.gui_mode is True
+
+    args_none = parser.parse_args([])
+    assert args_none.gui_mode is False
+
+
+def test_main_launches_gui(monkeypatch):
+    """Verify main(['--gui']) and main(['-g']) launch Qt6 GUI."""
+    gui_called = 0
+
+    def fake_launch_gui():
+        nonlocal gui_called
+        gui_called += 1
+        return 0
+
+    monkeypatch.setattr("src.gui.launch_gui", fake_launch_gui)
+    ret = main(["--gui"])
+    assert ret == 0
+    assert gui_called == 1
+
+    ret = main(["-g"])
+    assert ret == 0
+    assert gui_called == 2
+
+
+
 @pytest.fixture
 def sample_dubbing_docx(tmp_path):
     """Create a minimal hermetic dubbing script docx for testing."""
@@ -388,6 +421,99 @@ def test_pipeline_real_conversion_e2e(tmp_path, sample_dubbing_docx):
     assert len(table.rows) >= 2
     header_cells = [c.text for c in table.rows[0].cells]
     assert "Karakter" in header_cells[0]
+
+
+def test_process_dubbing_file_handles_pdf_and_docx(tmp_path):
+    """process_dubbing_file fonksiyonunun hem docx hem pdf uzantılarını uygun motora sevk ettiğini test eder."""
+    from kast import process_dubbing_file
+    from unittest.mock import patch, MagicMock
+
+    pdf_file = tmp_path / "test.pdf"
+    pdf_file.touch()
+
+    # 1. PDF testi
+    mock_pdf_res = MagicMock()
+    with patch("src.pdf_parser.process_pdf_document", return_value=("out.docx", mock_pdf_res)) as mock_pdf_func:
+        out, res = process_dubbing_file(str(pdf_file), standalone=True)
+        assert out == "out.docx"
+        assert res == mock_pdf_res
+        mock_pdf_func.assert_called_once()
+
+    # 2. PDF + in_place hatası testi
+    with pytest.raises(ValueError, match="PDF dosyalarının üzerine"):
+        process_dubbing_file(str(pdf_file), in_place=True)
+
+    # 3. DOCX testi
+    docx_file = tmp_path / "test.docx"
+    doc = Document()
+    doc.add_paragraph("ALICE\t- Merhaba Bob!")
+    doc.save(str(docx_file))
+
+    out_docx_path = str(tmp_path / "out_kast.docx")
+    with patch("kast.process_cast_document", return_value=out_docx_path) as mock_docx_func:
+        out, res = process_dubbing_file(str(docx_file), standalone=True)
+        assert out == out_docx_path
+        assert res.total_lines == 1
+        mock_docx_func.assert_called_once()
+
+
+def test_process_dubbing_file_file_not_found():
+    """Var olmayan dosyada FileNotFoundError fırlatıldığını doğrular."""
+    from kast import process_dubbing_file
+    with pytest.raises(FileNotFoundError, match="Dosya bulunamadı"):
+        process_dubbing_file("non_existent_file_xyz_999.pdf")
+
+
+def test_process_dubbing_file_unsupported_format(tmp_path):
+    """Desteklenmeyen uzantıda ValueError fırlatıldığını doğrular."""
+    from kast import process_dubbing_file
+    txt_file = tmp_path / "script.txt"
+    txt_file.touch()
+    with pytest.raises(ValueError, match="Desteklenmeyen dosya formatı"):
+        process_dubbing_file(str(txt_file))
+
+
+def test_process_dubbing_file_progress_callback(tmp_path):
+    """İlerleme bildirimlerinin (progress_callback) doğru çalıştığını doğrular."""
+    from kast import process_dubbing_file
+    from unittest.mock import patch, MagicMock
+
+    pdf_file = tmp_path / "test.pdf"
+    pdf_file.touch()
+
+    pdf_calls = []
+    def pdf_cb(pct, msg):
+        pdf_calls.append((pct, msg))
+
+    mock_pdf_res = MagicMock()
+    with patch("src.pdf_parser.process_pdf_document") as mock_pdf_func:
+        def fake_pdf_proc(pdf_path, output_path=None, sort_by="appearance", progress_callback=None):
+            if progress_callback:
+                progress_callback(1, 2, "Sayfa 1")
+                progress_callback(2, 2, "Sayfa 2")
+            return "out.docx", mock_pdf_res
+
+        mock_pdf_func.side_effect = fake_pdf_proc
+        out, res = process_dubbing_file(str(pdf_file), progress_callback=pdf_cb)
+        assert len(pdf_calls) >= 3
+        assert pdf_calls[0][0] == 10
+        assert pdf_calls[-1][0] == 100
+
+    docx_file = tmp_path / "test.docx"
+    doc = Document()
+    doc.add_paragraph("BOB\t- Selam!")
+    doc.save(str(docx_file))
+
+    docx_calls = []
+    def docx_cb(pct, msg):
+        docx_calls.append((pct, msg))
+
+    with patch("kast.process_cast_document", return_value=str(tmp_path / "out.docx")):
+        out, res = process_dubbing_file(str(docx_file), progress_callback=docx_cb)
+        assert len(docx_calls) == 2
+        assert docx_calls[0][0] == 15
+        assert docx_calls[1][0] == 100
+
 
 
 

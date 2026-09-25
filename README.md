@@ -29,11 +29,27 @@ Geleneksel kast çıkarma araçları veya manuel yöntemlere kıyasla Kast 2.0 �
 
 ---
 
-## ⚡ Hızlı Kurulum (Tek Komutla)
+## ⚡ Kurulum ve İndirme
 
-Depoyu klonladıktan sonra işletim sisteminize uygun kurulum scriptini çalıştırarak programı sisteminize entegre edebilirsiniz:
+### 🪟 Windows (Önerilen — Sıfır Bağımlılık / Python GEREKTİRMEZ)
 
-### 🐧 Linux (Bash)
+Dublaj stüdyoları ve Windows kullanıcıları için herhangi bir Python kurulumu, terminal veya ortam konfigürasyonu gerektirmeyen hazır paketler sunulmaktadır. [GitHub Releases](https://github.com/umutaktepe/kast/releases) sayfasından en son sürümü temin edebilirsiniz:
+
+- **💾 Kurulum Sihirbazı (`Kast-vX.Y.Z-Setup.exe`):**
+  - Çift tıklayarak klasik Windows sihirbazı ile kolayca kurun.
+  - Masaüstü ve Başlat Menüsü kısayollarını otomatik oluşturur.
+  - **Akıllı Ofis Tespiti:** Sistemde Microsoft Word veya LibreOffice varlığını otomatik denetler. İkisi de yoksa, senaryo sayfa numaralarını %100 kesinlikle tespit edebilmek için gereken LibreOffice paketini arka planda sessizce (silent) indirip kurar. Sizin hiçbir ek işlem yapmanız gerekmez!
+- **💼 Taşınabilir Sürüm (`Kast-vX.Y.Z-Windows-Portable.zip`):**
+  - Kurulum veya yönetici yetkisi gerektirmez.
+  - ZIP arşivini dilediğiniz bir klasöre veya USB belleğe çıkartıp `KastStudio.exe` dosyasını doğrudan çalıştırabilirsiniz.
+
+---
+
+### 🛠️ Kaynak Koddan Kurulum (Geliştiriciler ve Linux/macOS)
+
+Depoyu klonlayarak yerel Python ortamınızda çalıştırmak isterseniz:
+
+#### 🐧 Linux / macOS (Bash)
 ```bash
 git clone https://github.com/umutaktepe/kast.git
 cd kast
@@ -41,32 +57,44 @@ chmod +x install.sh && ./install.sh
 ```
 *Bu script sanal ortamı kurar, bağımlılıkları yükler ve `~/.local/bin/kast` sembolik bağını oluşturur. Artık terminalinizin herhangi bir yerinden sadece `kast` yazmanız yeterlidir.*
 
-### 🪟 Windows (CMD veya PowerShell)
+#### 🪟 Windows (Kaynak Kod / Geliştirici Betiği)
 ```cmd
 git clone https://github.com/umutaktepe/kast.git
 cd kast
 install.bat
 ```
 *(Veya doğrudan `install.bat` dosyasına çift tıklayabilir ya da PowerShell ile `powershell -ExecutionPolicy Bypass -File .\install.ps1` çalıştırabilirsiniz).*
-*Bu script sanal ortamı kurar, bağımlılıkları yükler, `%USERPROFILE%\bin\kast.cmd` başlatıcısını oluşturur ve Kullanıcı `PATH` ortam değişkenine otomatik ekler. Artık CMD veya PowerShell'de sadece `kast` yazmanız yeterlidir.*
+*Bu script sanal ortamı kurar, bağımlılıkları yükler, `%USERPROFILE%\bin\kast-gui.cmd` ve `%USERPROFILE%\bin\kast.cmd` başlatıcılarını oluşturur ve Kullanıcı `PATH` ortam değişkenine otomatik ekler. Artık masaüstünden, Başlat/Çalıştır'dan veya terminalden `kast-gui` yazmanız yeterlidir.*
 
-### 🗑️ Programı Kaldırma (Uninstall)
-- **Linux:**
-  ```bash
-  ./uninstall.sh
-  ```
-- **Windows:**
-  ```cmd
-  uninstall.bat
-  ```
-  *(veya `powershell -ExecutionPolicy Bypass -File .\uninstall.ps1`)*
+#### 🗑️ Programı Kaldırma (Uninstall)
+- **Kurulum Sihirbazı ile Kurulduysa:** Windows Ayarlar -> Uygulamalar (Program Ekle/Kaldır) üzerinden "Kast Studio" seçilerek tek tıkla kaldırılabilir.
+- **Kaynak Kod Kurulumu:**
+  - Linux: `./uninstall.sh`
+  - Windows: `uninstall.bat` *(veya `powershell -ExecutionPolicy Bypass -File .\uninstall.ps1`)*
 *Bu işlem terminal başlatıcısını sisteminizden temizler. Ardından klasörü silebilirsiniz.*
 
 ---
 
 ## 💻 Kullanım Şekilleri
 
-### 1. Görsel Terminal Arayüzü (TUI) — Önerilen
+### 1. Modern Masaüstü Grafik Arayüzü (Qt6 Studio GUI) — Windows Stüdyoları İçin
+
+Windows kullanıcıları ve seslendirme stüdyoları için tasarlanmış piksel hassasiyetindeki grafiksel arayüz:
+
+- **Çift Tıklama ile Başlatma:** Klasördeki `kast-gui.cmd` dosyasına doğrudan çift tıklayarak açabilirsiniz (veya sağ tıklayıp masaüstüne kısayol oluşturabilirsiniz).
+- **Çalıştır (Run) ile:** `Win + R` tuşlarına basıp `kast-gui` yazarak anında başlatabilirsiniz.
+- **Terminalden:** `kast-gui` veya `kast --gui`
+
+**Öne Çıkan Özellikler:**
+- **Sürükle-Bırak:** `.docx` veya `.pdf` senaryo dosyasını doğrudan bulut rozetli alana sürükleyip bırakın (ayrı referans PDF gerekmez).
+- **Doğrudan PDF Desteği:** PDF senaryolarda Word dönüşümüne ihtiyaç kalmadan doğrudan ve kayıpsız sayfa analizi yapar.
+- **Kutulu Seçenekler:** İlk Görünme Sırası, Replik Sayısı ve Karakter Adına göre sıralama seçenekleri.
+- **Çıktı Tercihleri:** Ayrı kopya (`<ad>_kast.docx`) veya orijinal belgenin sonuna ekleme.
+- **Canlı Monospace Konsol:** Analiz aşamalarını gerçek zamanlı terminal günlüğünde izleme.
+
+---
+
+### 2. Görsel Terminal Arayüzü (TUI)
 
 Terminalde sadece `kast` yazın:
 
@@ -214,13 +242,19 @@ Proje kapsamlı bir test süitine (`pytest`) sahiptir:
 .venv/bin/pytest -v
 ```
 
-### Test Kapsamı (61/61 Başarılı Test):
-- `tests/test_models.py` — Veri modelleri, replik ekleme ve sayfa formatlama testleri.
+### Test Kapsamı (154 Başarılı Test):
+- `tests/test_models.py` — Veri modelleri, diyalog nesneleri, replik ekleme ve sayfa formatlama testleri.
 - `tests/test_parser.py` — Başlık tespiti, zaman kodu ayrıştırma ve karmaşık diyalog satırları.
+- `tests/test_pdf_parser.py` — Doğrudan PDF diyalog ve sayfa ayrıştırma, künye filtreleme ve standart Word tablosu üretimi.
 - `tests/test_paginator.py` — Çok katmanlı sayfa motoru, Pillow font simülasyonu, XML kesmeleri ve PDF referansı.
-- `tests/test_table_writer.py` — Tablo oluşturma, OpenXML kenarlıkları, dikey ortalama, dinamik font tespiti, sütun genişlikleri ve bağımsız belge modu.
-- `tests/test_integration.py` — Uçtan uca boru hattı, CLI argümanları, `--count` kısayolu, sürükle-bırak parametreleri, TUI dispatch ve Pororo örnek döküman doğrulaması.
-- `tests/test_tui.py` — Textual TUI widget montajı, buton aksiyonları, hata yakalama ve uçtan uca arayüz testleri.
+- `tests/test_pdf_converter.py` — Headless LibreOffice ve Word COM dönüştürücüleri ve otomatik ofis algılama.
+- `tests/test_table_writer.py` — Tablo oluşturma, OpenXML Table Grid kenarlıkları, dikey ortalama, dinamik font tespiti, sütun genişlikleri ve bağımsız mod.
+- `tests/test_integration.py` — Uçtan uca boru hattı, CLI argümanları, `--count` kısayolu, sürükle-bırak parametreleri, birleşik dosya yönlendirici ve Pororo doğrulaması.
+- `tests/test_tui.py` — Textual TUI widget montajı, buton aksiyonları, hata yakalama ve uçtan uca terminal arayüz testleri.
+- `tests/test_gui.py` — PySide6 Qt6 masaüstü GUI, StudioTheme koyu paleti, DropZoneWidget sürükle-bırak, ExtractionWorker arka plan iş parçacığı ve duyarlı pencere testleri.
+- `tests/test_packaging.py` — PyInstaller kast.spec mimarisi, izole GUI başlatıcı (run_gui.py) ve 7 çözünürlüklü stüdyo ikonu üretimi (generate_icon.py).
+- `tests/test_inno_setup.py` — Inno Setup kurulum yapılandırması (installer.iss), Pascal script ile Word/LibreOffice tespiti ve sessiz kurulum fallback'i.
+- `tests/test_ci_workflow.py` — GitHub Actions Windows CI/CD boru hattı (release-windows.yml), yapı adımları, izinler ve yayın otomasyonu.
 
 
 ---

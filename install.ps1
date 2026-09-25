@@ -40,7 +40,7 @@ if (-not (Test-Path $VenvPython)) {
 
 # 3. Bagimliliklarin yuklenmesi
 Write-Host "[*] Bagimliliklar kontrol ediliyor..." -ForegroundColor Cyan
-& $VenvPython -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(p) for p in ['docx', 'PIL', 'textual']) else 1)"
+& $VenvPython -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(p) for p in ['docx', 'PIL', 'textual', 'PySide6']) else 1)"
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[OK] Gerekli tum bagimliliklar zaten sanal ortamda mevcut." -ForegroundColor Green
 } else {
@@ -124,6 +124,21 @@ $CmdLines = @(
 $CmdLines | Set-Content -Path $KastCmdTarget -Encoding ASCII
 Write-Host "[OK] Baslatici dosyasi olusturuldu: $KastCmdTarget" -ForegroundColor Green
 
+$KastGuiCmdTarget = Join-Path $UserBin "kast-gui.cmd"
+$GuiCmdLines = @(
+    "@echo off",
+    "setlocal",
+    "chcp 65001 >nul 2>&1",
+    "if exist `"$VenvPython`" (",
+    "    `"$VenvPython`" `"$RepoDir\kast.py`" --gui %*",
+    ") else (",
+    "    python `"$RepoDir\kast.py`" --gui %*",
+    ")",
+    "endlocal"
+)
+$GuiCmdLines | Set-Content -Path $KastGuiCmdTarget -Encoding ASCII
+Write-Host "[OK] GUI Baslatici dosyasi olusturuldu: $KastGuiCmdTarget" -ForegroundColor Green
+
 # 5. Kullanici PATH ortam degiskenine ekleme
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if (-not $UserPath) {
@@ -149,6 +164,7 @@ Write-Host "======================================================" -ForegroundC
 Write-Host "  Kurulum Basariyla Tamamlandi!                       " -ForegroundColor Green
 Write-Host "======================================================" -ForegroundColor Green
 Write-Host "Artik yeni bir komut istemi (CMD) veya PowerShell penceresi acarak:" -ForegroundColor White
+Write-Host "  kast-gui          (Modern Qt6 Studio GUI arayuzunu acar)" -ForegroundColor Yellow
 Write-Host "  kast              (Gorsel TUI arayuzunu acar)" -ForegroundColor Yellow
 Write-Host "  kast dosya.docx   (Hizli komut satiri modunda calistirir)" -ForegroundColor Yellow
 Write-Host "komutlarini dogrudan kullanabilirsiniz." -ForegroundColor White

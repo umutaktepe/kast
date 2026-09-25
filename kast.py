@@ -28,7 +28,7 @@ except ImportError:
                 sys.path.insert(0, sp)
 
 from collections import OrderedDict
-from typing import List, Optional
+from typing import Callable, List, Optional, Tuple
 
 from docx import Document
 
@@ -37,6 +37,8 @@ from src.paginator import DocumentPaginator
 from src.parser import DubbingDocxParser
 from src import pdf_converter
 from src.pdf_converter import PdfConversionError, temp_docx_to_pdf
+from src import pdf_parser
+from src.pdf_parser import process_pdf_document
 from src.table_writer import CastTableWriter
 
 
@@ -144,6 +146,73 @@ def process_cast_document(
 process_dubbing_script = process_cast_document
 
 
+def process_dubbing_file(
+    file_path: str,
+    output_path: Optional[str] = None,
+    sort_by: str = "appearance",
+    in_place: bool = False,
+    standalone: bool = True,
+    progress_callback: Optional[Callable[[int, str], None]] = None,
+) -> Tuple[str, CastExtractionResult]:
+    """Unified processor handling both .docx and .pdf dubbing scripts."""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Dosya bulunamadı: {file_path}")
+
+    ext = os.path.splitext(file_path)[1].lower()
+
+    if ext == ".pdf":
+        if in_place:
+            raise ValueError("PDF dosyalarının üzerine doğrudan Word tablosu yazılamaz. Lütfen ayrı dosya olarak kaydedin.")
+        if progress_callback:
+            progress_callback(10, "PDF dosyası doğrudan ayrıştırılıyor (%100 yerel)...")
+
+        def pdf_progress(page: int, total: int, msg: str):
+            if progress_callback:
+                pct = int(10 + (page / max(1, total)) * 75)
+                progress_callback(pct, msg)
+
+        saved_path, result = pdf_parser.process_pdf_document(
+            pdf_path=file_path,
+            output_path=output_path,
+            sort_by=sort_by,
+            progress_callback=pdf_progress,
+        )
+        if progress_callback:
+            progress_callback(100, f"Tamamlandı: {os.path.basename(saved_path)}")
+        return saved_path, result
+
+    elif ext == ".docx":
+        if progress_callback:
+            progress_callback(15, "Word dökümanı yükleniyor ve paragraflar taranıyor...")
+
+        target_output = file_path if (in_place and not output_path) else output_path
+
+        # Orijinal akış
+        saved_path = process_cast_document(
+            docx_path=file_path,
+            output_path=target_output,
+            pdf_path=None,
+            sort_by=sort_by,
+            standalone=standalone if not in_place else False,
+        )
+        # Parse result to return stats
+        doc = Document(file_path)
+        parser = DubbingDocxParser()
+        paras = parser.parse_document_paragraphs(doc)
+        dial_count = sum(1 for p in paras if p.speaker and p.dialogue)
+        result = CastExtractionResult(
+            characters=[],
+            total_lines=dial_count,
+            total_pages=1,
+        )
+        if progress_callback:
+            progress_callback(100, f"Tamamlandı: {os.path.basename(saved_path)}")
+        return saved_path, result
+    else:
+        raise ValueError(f"Desteklenmeyen dosya formatı: {ext}. Lütfen bir .docx veya .pdf dosyası seçin.")
+
+
+
 def build_cli_parser() -> argparse.ArgumentParser:
     """Build command line argument parser for Kast CLI."""
     parser = argparse.ArgumentParser(
@@ -183,6 +252,13 @@ def build_cli_parser() -> argparse.ArgumentParser:
         dest="sort_name",
         action="store_true",
         help="Karakterleri ada göre alfabetik sırala (--sort name kısayolu).",
+    )
+    parser.add_argument(
+        "--gui",
+        "-g",
+        dest="gui_mode",
+        action="store_true",
+        help="Modern Qt6 Masaüstü Arayüzünü (GUI) başlat.",
     )
     parser.add_argument(
         "--tui",
@@ -236,6 +312,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     raw_argv = sys.argv[1:] if argv is None else argv
     parser = build_cli_parser()
     args = parser.parse_args(argv)
+
+    if args.gui_mode:
+        from src.gui import launch_gui
+        return launch_gui()
 
     # Argümansız çağrıldığında veya --tui verildiğinde TUI aç
     should_launch_tui = args.tui_mode or (not raw_argv and not args.cli_mode)

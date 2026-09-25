@@ -14,19 +14,28 @@ tags:
 
 Kast 2.0, kullanıcıların karmaşık Python veya sanal ortam konfigürasyonlarıyla uğraşmadan tek bir komutla sisteme entegre olabilmesi için tasarlanmış sağlam kurulum ve dağıtım betiklerine sahiptir.
 
-İlgili mimari prensipler [[adr-004-hybrid-launcher-and-dual-ui]] ve [[adr-002-strict-pdf-pagination-flow]] kararlarıyla uyumludur.
+İlgili mimari prensipler [[adr-004-hybrid-launcher-and-dual-ui]], [[adr-002-strict-pdf-pagination-flow]], [[adr-005-qt6-windows-studio-gui]] ve [[adr-006-windows-standalone-installer-and-ci]] kararlarıyla uyumludur.
 
 ## Kurulum Dosyaları ve Görevleri
 
-| Dosya | Platform | Temel Görevi |
+| Dosya / Paket | Platform | Temel Görevi |
 | :--- | :--- | :--- |
+| `Kast-vX.Y.Z-Setup.exe` | Windows (x64) | **Resmi Bağımsız Kurulum Sihirbazı:** Python gerektirmez; Inno Setup 6 ile masaüstü/başlat kısayolları kurar, sistemde Word/LibreOffice denetimi yapar ve yoksa LibreOffice'i sessizce yükler ([[inno-setup-installer]]). |
+| `Kast-vX.Y.Z-Windows-Portable.zip` | Windows (x64) | **Taşınabilir Bağımsız Sürüm:** Kurulum ve yönetici yetkisi gerektirmeyen, USB bellek veya yerel klasörden doğrudan çalışan PyInstaller klasör demeti ([[pyinstaller-standalone-packaging]]). |
 | `install.sh` | Linux / macOS (Bash) | Sanal ortam (`.venv`) kurar, LibreOffice paketini (apt/dnf/pacman/zypper) kontrol edip kurar, bağımlılıkları yükler ve `~/.local/bin/kast` sembolik bağını oluşturur. |
-| `install.ps1` | Windows (PowerShell) | Python sanal ortamını kurar, LibreOffice kontrolü yapar (winget/choco desteği), bağımlılıkları yükler, `%USERPROFILE%\bin\kast.cmd` başlatıcısını oluşturur ve Kullanıcı `PATH` ortam değişkenine ekler. |
+| `install.ps1` | Windows (PowerShell) | Geliştirici ve CLI kullanıcıları için Python sanal ortamını kurar, LibreOffice kontrolü yapar (winget/choco desteği), bağımlılıkları yükler, `%USERPROFILE%\bin\kast.cmd` başlatıcısını oluşturur ve Kullanıcı `PATH` ortam değişkenine ekler. |
 | `install.bat` | Windows (CMD) | Çift tıklamayla veya CMD'den `install.ps1` dosyasını `ExecutionPolicy Bypass` ile çalıştıran sarmalayıcı (wrapper). |
 | `bin/kast` | Linux / macOS | Sanal ortamdaki Python'u ve ana betiği (`kast.py`) tetikleyen yürütülebilir kabuk başlatıcısı. |
 | `kast.cmd` | Windows | Windows komut satırından sanal ortam Python'unu çağıran batch başlatıcısı. |
 | `kast-gui.cmd` | Windows | Modern Qt6 Stüdyo GUI (`kast.py --gui`) arayüzünü doğrudan çağıran Windows batch başlatıcısı. |
 | `uninstall.sh` / `uninstall.ps1` | Tüm Platformlar | Sembolik bağları ve başlatıcıları sistemden temizleyen kaldırma betikleri. |
+
+## Bağımsız Windows Paketleri (Zero-Python Dağıtım)
+
+Kast 2.0, son kullanıcıların Python veya sanal ortam kurmasını gerektirmeyen bağımsız Windows dağıtımlarına sahiptir ([[adr-006-windows-standalone-installer-and-ci]]):
+- **PyInstaller Demeti:** `packaging/kast.spec` ile tüm Qt6 ve ayrıştırma kütüphaneleri `dist/KastStudio/` içerisine derlenir.
+- **Inno Setup Sihirbazı:** `packaging/installer.iss` ile derlenen kurulum dosyası, sistemde Word ve LibreOffice arar; ikisi de yoksa arka planda `winget` veya PowerShell ile LibreOffice'i otomatik ve sessiz kurar.
+- **GitHub Actions CI/CD:** `.github/workflows/release-windows.yml` boru hattı ile her yeni sürümde kurulum dosyaları ve SHA256 özetleri otomatik üretilir ([[github-actions-release-workflow]]).
 
 ## Otomatik LibreOffice Yönetimi
 
@@ -36,8 +45,10 @@ Kast 2.0, kullanıcıların karmaşık Python veya sanal ortam konfigürasyonlar
   - Ubuntu/Debian: `sudo apt-get install -y libreoffice-writer`
   - Arch Linux: `sudo pacman -S --noconfirm libreoffice-fresh`
   - openSUSE: `sudo zypper install -y libreoffice-writer`
-- **Windows:**
+- **Windows (Geliştirici Scripti):**
   - Sistem PATH veya Program Files taranır; eksikse `winget install TheDocumentFoundation.LibreOffice` yönergesi verilir.
+- **Windows (Kurulum Sihirbazı):**
+  - Inno Setup Pascal scripti ile sistemde Word veya LibreOffice bulunmadığı takdirde kullanıcı müdahalesine gerek kalmadan sessizce kurulur.
 
 ## Sudo / Root İzolasyonu
 
@@ -45,6 +56,10 @@ Kast 2.0, kullanıcıların karmaşık Python veya sanal ortam konfigürasyonlar
 
 ## İlgili Sayfalar
 
+- [[inno-setup-installer]]
+- [[pyinstaller-standalone-packaging]]
+- [[github-actions-release-workflow]]
+- [[adr-006-windows-standalone-installer-and-ci]]
 - [[headless-pdf-converter]]
 - [[hybrid-cli-dispatcher]]
 - [[terminal-user-interface]]

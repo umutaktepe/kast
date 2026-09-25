@@ -1,0 +1,92 @@
+name: Build and Release Windows Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Sürüm numarası (örn: 2.1.0 veya v2.1.0)'
+        required: false
+        default: '2.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows Binaries & Installer
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Version
+        id: determine_version
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch' -and '${{ inputs.version }}') {
+            $ver = '${{ inputs.version }}'.TrimStart('v')
+          } elseif ('${{ github.ref_name }}') {
+            $ver = '${{ github.ref_name }}'.TrimStart('v')
+          } else {
+            $ver = '2.1.0'
+          }
+          Write-Host "Target Version: $ver"
+          "VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller Pillow
+
+      - name: Generate Application Icon
+        run: |
+          python packaging/generate_icon.py
+
+      - name: Compile Standalone Bundle with PyInstaller
+        run: |
+          pyinstaller packaging/kast.spec --noconfirm
+
+      - name: Pack Portable ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\KastStudio\* -DestinationPath dist\Kast-v$($env:VERSION)-Windows-Portable.zip -CompressionLevel Optimal
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup --no-progress -y
+
+      - name: Compile Inno Setup Installer
+        shell: cmd
+        run: |
+          "C:\Program Files (x86)\Inno Setup 6\iscc.exe" /DMyAppVersion=%VERSION% packaging\installer.iss
+
+      - name: Generate SHA256 Checksums
+        shell: pwsh
+        run: |
+          Get-FileHash dist\Kast-v$($env:VERSION)-Setup.exe, dist\Kast-v$($env:VERSION)-Windows-Portable.zip -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash)  $([System.IO.Path]::GetFileName($_.Path))" } |
+            Out-File -FilePath dist\checksums.txt -Encoding utf8
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Kast Studio v${{ env.VERSION }}
+          generate_release_notes: true
+          files: |
+            dist/Kast-v${{ env.VERSION }}-Setup.exe
+            dist/Kast-v${{ env.VERSION }}-Windows-Portable.zip
+            dist/checksums.txt

@@ -106,8 +106,18 @@ try {{
                 kwargs = {}
                 if sys.platform == "win32":
                     kwargs["creationflags"] = 0x08000000
+                user_profile = os.path.join(lo_temp_dir, "user")
                 res = subprocess.run(
-                    [soffice_cmd, "--headless", "--convert-to", "pdf", abs_docx, "--outdir", lo_temp_dir],
+                    [
+                        soffice_cmd,
+                        f"-env:UserInstallation=file://{user_profile}",
+                        "--headless",
+                        "--convert-to",
+                        "pdf",
+                        abs_docx,
+                        "--outdir",
+                        lo_temp_dir,
+                    ],
                     capture_output=True,
                     timeout=45,
                     **kwargs,

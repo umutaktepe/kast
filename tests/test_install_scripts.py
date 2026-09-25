@@ -149,3 +149,20 @@ def test_install_ps1_word_and_libreoffice_checks():
     assert "--silent" in content, "install.ps1 winget command should include --silent"
     assert "--accept-package-agreements" in content, "install.ps1 should accept package agreements"
     assert "--accept-source-agreements" in content, "install.ps1 should accept source agreements"
+
+
+def test_kast_gui_cmd_exists_and_contains_pyside_entrypoint():
+    """kast-gui.cmd başlatıcısının doğru Python ve GUI argümanlarını içerdiğini doğrular."""
+    assert os.path.exists("kast-gui.cmd")
+    with open("kast-gui.cmd", "r", encoding="utf-8", errors="ignore") as f:
+        content = f.read()
+    assert "--gui" in content or "src.gui" in content
+
+
+def test_install_ps1_generates_kast_gui_cmd():
+    """Verify install.ps1 generates kast-gui.cmd and lists it in completion message."""
+    with open(INSTALL_PS1, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "kast-gui.cmd" in content
+    assert "kast-gui" in content
+

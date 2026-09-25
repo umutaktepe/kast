@@ -117,4 +117,94 @@ Bu dosya, Andrej Karpathy'nin LLM Wiki prensiplerine uygun olarak kronolojik ve 
   - Living Architecture graf hijyeni (yetim sayfa ve kırık link kontrolü) test edildi, %100 uyum doğrulandı.
 - **Etkilenen Sayfalar:** [[adr-005-qt6-windows-studio-gui]], [[qt6-desktop-gui]], [[index]], [[hybrid-cli-dispatcher]], [[cross-platform-installers]], [[log]]
 
+---
+
+## [2026-09-22] refactor | Pixel-Perfect DropZoneWidget Mockup Güncellemesi
+- **Ajan Rolü:** Task 3 Kodlama ve TDD Ajanı
+- **Yapılan İşlem:**
+  - `DropZoneWidget` bileşeni mockup tasarımına pixel-for-pixel uyumlu hale getirildi:
+    - Boş durum: Dairesel bulut ikonu rozeti (`☁↑`), ana metin (`Senaryo dosyasını (.docx veya .pdf) buraya sürükleyip bırakın`), alt metin (`Microsoft Word veya metin formatlı senaryo PDF'leri desteklenmektedir.`), format hapları (`.DOCX` ve `.PDF`) ve `☁  Dosya Seç` butonu.
+    - Yüklü durum: Dosya türü rozeti (`#0284c7` / `#f43f5e`), dosya boyutu ve yolu bilgisi, `✕ Değiştir` butonu.
+    - Dinamik kenarlık ve arka plan stilleri: Boşta kesikli `#223554` (`#0c1424`), hover anında `#38bdf8` (`#111d33`), yüklü halde dolu `#10b981`.
+  - TDD döngüsü ile `test_drop_zone_widget_mockup_elements` birim testi eklendi ve tüm mevcut testler (`test_drop_zone_widget_*`) güncel palete adapte edildi.
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
+
+---
+
+## [2026-09-22] feat | Ana Pencere Yerleşimi, Başlık Rozeti ve Konsol Güncellemesi (KastStudioWindow)
+- **Ajan Rolü:** Task 4 Kodlama ve TDD Ajanı
+- **Yapılan İşlem:**
+  - `KastStudioWindow` ve `OptionTileWidget` bileşenleri stüdyo mockup tasarımına göre pixel-for-pixel uyarlandı:
+    - Başlık: `lbl_title_prefix` ("Kast 2.0", `#38bdf8`), `lbl_title_suffix` (" — Dublaj Kast Çıkarma", `#f8fafc`), `lbl_subtitle` ve `lbl_badge` ("● Windows Studio Edition • Qt6", `#0f293a` zemin, `#084c61` kenarlık).
+    - Çift kart paneli: Sol kartta `lbl_sort_title` ve 3 adet `OptionTileWidget` (`tile_appearance`, `tile_count`, `tile_name`); sağ kartta `lbl_out_title` ve 2 adet `OptionTileWidget` (`tile_standalone` with `(<ad>_kast.docx)`, `tile_inplace`), ayırıcı çizgi ve `lbl_output_meta` alt bilgi satırı.
+    - Karşılıklı dışlama: `OptionTileGroup` sınıfı eklendi; kartlar tıklandığında veya `setChecked(True)` çağrıldığında kardeş kartları devreden çıkaracak şekilde bağlandı.
+    - Geriye dönük uyumluluk: `OptionTileWidget` içine `isChecked()` ve `setChecked(bool)` eklendi; `window.rb_*` takma adları korundu; PDF seçiminde in-place devre dışı bırakma mantığı korundu.
+    - Aksiyon butonları: `btn_extract` ("▶  Kast Tablosunu Çıkar", `#btn-primary`, stretch=4) ve `btn_clear` ("🗑  Temizle", `#btn-clear`, stretch=1).
+    - Durum & İlerleme: `lbl_status` ("● Durum: Hazır"), `lbl_pct` ("%0") ve 6px ince camgöbeği `progress_bar`.
+    - Konsol: `lbl_log_title` ("🖥  İŞLEM GÜNLÜĞÜ"), `lbl_log_meta` ("UTF-8 / Terminal hazır") ve `#080c14` zeminli `log_area`.
+    - Durum Çubuğu: `lbl_status_left` ("PySide6 Modern Frame  |  Hazır") ve `lbl_status_right` ("Encoding: UTF-8").
+  - TDD döngüsü ile `test_kast_studio_window_mockup_layout` ve `test_option_tile_widget_compatibility_and_group` testleri eklendi; 22 GUI testi ve tüm 133 sistem testi yeşil geçti.
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
+
+## [2026-09-22] [hata-duzeltme-ve-mizanpaj] | Pencereli Modda Duyarlı (Responsive) Mizanpaj ve QScrollArea İyileştirmesi
+- **Ajan Rolü:** Living Architecture & Qt6 GUI Mühendisi
+- **Yapılan İşlem:**
+  - Tam ekran olmayan veya küçük pencereli kullanımlarda `OptionTileWidget` başlıklarının 0 yüksekliğe ezilmesi ve `DropZoneWidget` ikon/başlık elemanlarının üst üste binmesi sorunu giderildi.
+  - `OptionTileWidget` ve `DropZoneWidget` bileşenlerine `QSizePolicy.Fixed` dikey boyutu ve koruyucu minimum yükseklikler atandı. QSS `padding` ile Python layout `contentsMargins` arasındaki çakışma giderildi.
+  - `DropZoneWidget` boş durum konteynerindeki çift marjin temizlendi, ikon boyutu (40x40px) ve eleman aralıkları optimize edilerek çakışmasız 160px yüksekliğe uyarlandı.
+  - `KastStudioWindow` ana içerik alanı `QScrollArea` ile sarmalandı; ekstra dikey alan `log_area` konsoluna bağlandı (`stretch=1`). Pencere boyutu küçüldüğünde içerikler ezilmeden şık koyu kaydırma çubuğu devreye alındı.
+  - `test_kast_studio_window_responsive_layout_non_fullscreen` birim testi yazıldı ve 800x600, 860x740, 1024x768, 1920x1080 çözünürlüklerde doğrulandı; 23 GUI testi ve projenin tüm 134 testi eksiksiz geçti.
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
+
+---
+
+## [2026-09-23] feat | PyInstaller Yapılandırması, Giriş Noktası ve İkon Üretici (Task 1)
+- **Ajan Rolü:** Task 1 Kodlama ve Paketleme Ajanı
+- **Yapılan İşlem:**
+  - `packaging/generate_icon.py` geliştirildi: PNG/JPEG veya geometrik fallback üzerinden 7 çözünürlüklü (`16x16` - `256x256`) `.ico` üreten CLI ve modül API'si oluşturuldu.
+  - `packaging/run_gui.py` oluşturuldu: PyInstaller için konsolsuz doğrudan `launch_gui()` çağıran izole giriş noktası sağlandı.
+  - `packaging/kast.spec` yapılandırıldı: Klasör demeti (`dist/KastStudio/`), veri dosyaları (`docs`, `example`, `packaging/assets`), gizli modüller (`PySide6`, `docx`, `pdfplumber`, `pypdf`, `PIL`) ve gereksiz kütüphane dışlamaları (`tkinter`, `matplotlib`, `scipy`) ayarlandı.
+  - `src/gui.py` güncellendi: `KastStudioWindow.__init__` içerisinde `QIcon` ile `kast_icon.png` ve `kast.ico` pencerelere bağlandı; `sys._MEIPASS` PyInstaller uyumu sağlandı.
+- **Etkilenen Sayfalar:** [[pyinstaller-standalone-packaging]], [[qt6-desktop-gui]], [[index]], [[log]]
+
+---
+
+## [2026-09-23] feat | Inno Setup Kurulum Sihirbazı (installer.iss) ve Sessiz LibreOffice Kurulumu (Task 2)
+- **Ajan Rolü:** Task 2 Kodlama ve Inno Setup Paketleme Ajanı
+- **Yapılan İşlem:**
+  - `packaging/installer.iss` scripti geliştirildi: Inno Setup 6 ile Modern Wizard stili, `x64` mimarisi, `lzma2/ultra64` sıkıştırma, Türkçe/İngilizce dil desteği ve `{autopf}\Kast Studio` hedef dizini yapılandırıldı.
+  - Başlat Menüsü, Masaüstü (`desktopicon` görevi) ve Windows Program Ekle/Kaldır entegrasyonu `assets\kast.ico` ikonuyla bağlandı.
+  - Pascal Script (`[Code]`) bloğu inşa edildi:
+    - `IsWordInstalled()`: `HKLM`/`HKCU` `App Paths\Winword.exe` ve `HKCR` `Word.Application` COM nesnesini sorgular.
+    - `IsLibreOfficeInstalled()`: `HKLM`/`HKCU` `LibreOffice\UNO\InstallPath`, `The Document Foundation` kayıtları ve bilinen dizinlerdeki (`{pf}`, `{pf32}`, `{localappdata}`) `soffice.exe` varlığını denetler.
+    - `CurStepChanged(ssPostInstall)`: Eğer ne Word ne de LibreOffice bulunamazsa, kullanıcıya sormadan arka planda sessizce önce `winget` (`TheDocumentFoundation.LibreOffice --silent`), başarısız olursa PowerShell ile doğrudan resmi LibreOffice MSI paketini indirip `msiexec /i ... /qn /norestart` ile kurar.
+  - `tests/test_inno_setup.py` birim test takımı yazıldı: Bölüm varlığı, meta veri & ikonlar, diller, dosyalar, kısayollar, Pascal ofis tespiti ve sessiz kurulum argümanları test edildi (7/7 yeşil).
+  - Yaşayan mimari dokümantasyonu oluşturuldu (`docs/kast-app-wiki/interfaces-and-runtime/inno-setup-installer.md`), `index.md` ve `pyinstaller-standalone-packaging.md` sayfaları çapraz bağlandı.
+- **Etkilenen Sayfalar:** [[inno-setup-installer]], [[pyinstaller-standalone-packaging]], [[index]], [[log]]
+
+---
+
+## [2026-09-23] feat | GitHub Actions Otomatik Windows Derleme ve Sürüm Dağıtımı (Task 3)
+- **Ajan Rolü:** Task 3 Kodlama ve CI/CD Dağıtım Ajanı
+- **Yapılan İşlem:**
+  - `.github/workflows/release-windows.yml` iş akışı oluşturuldu: `windows-latest` koşucusunda Python 3.11 ortamı, bağımlılık kurulumu, çoklu çözünürlüklü ikon üretimi, PyInstaller ile `dist/KastStudio/` klasör demeti, taşınabilir `dist/Kast-v<VERSION>-Windows-Portable.zip`, Chocolatey ile Inno Setup kurulumu ve `dist/Kast-v<VERSION>-Setup.exe` derlemesi sağlandı.
+  - Kriptografik bütünlük için PowerShell `Get-FileHash` ile SHA256 sağlama listesi (`dist/checksums.txt`) oluşturuldu.
+  - `softprops/action-gh-release@v2` eylemi ile etiket itmelerinde (`v*`) veya manuel `workflow_dispatch` tetikleyicilerinde varlıklar ve sürüm notları GitHub Releases üzerinde yayımlanacak şekilde yapılandırıldı.
+  - `tests/test_ci_workflow.py` birim test takımı yazıldı (6/6 yeşil): YAML sözdizimi, tetikleyiciler, izinler, koşucu, adımlar, özel kabuklar (`pwsh`, `cmd`) ve yayın koşulları doğrulandı.
+  - Yaşayan mimari dokümantasyonu oluşturuldu (`docs/kast-app-wiki/interfaces-and-runtime/github-actions-release-workflow.md`), `index.md`, `inno-setup-installer.md` ve `pyinstaller-standalone-packaging.md` sayfaları çapraz bağlandı.
+- **Etkilenen Sayfalar:** [[github-actions-release-workflow]], [[inno-setup-installer]], [[pyinstaller-standalone-packaging]], [[index]], [[log]]
+
+---
+
+## [2026-09-23] docs | Living Architecture Wiki Senkronizasyonu ve ADR-006 (Windows Standalone & CI/CD)
+- **Ajan Rolü:** Task 4 Living Architecture ve Dokümantasyon Ajanı
+- **Yapılan İşlem:**
+  - `adr-006-windows-standalone-installer-and-ci.md` mimari karar kaydı yayımlandı: PyInstaller klasör demeti, Inno Setup 6 akıllı ofis tespiti (Word/LibreOffice sessiz kurulum stratejisi), Portable ZIP ve GitHub Actions CI/CD bulut derleme mimarisi belgelendi.
+  - `cross-platform-installers.md` güncellendi: Windows Standalone Setup (`.exe`) ve Portable (`.zip`) dağıtım matrisine eklendi; sıfır Python gereksinimi ve sessiz ofis stratejisi açıklandı.
+  - `README.md` güncellendi: Kurulum bölümünün başına Windows Setup ve Portable indirmeleri öncelikli olarak yerleştirildi; Python gerektirmediği ve akıllı ofis tespiti vurgulandı; test kapsamı 154 teste güncellendi.
+  - Fihrist (`index.md`) güncellenerek ADR-006 MOC listesine eklendi.
+  - İlgili tüm atomik modüller (`pyinstaller-standalone-packaging.md`, `inno-setup-installer.md`, `github-actions-release-workflow.md`, `cross-platform-installers.md`) çift yönlü wikilink grafına bağlandı.
+  - Living Architecture graf hijyeni (kırık link ve yetim sayfa denetimi) çalıştırıldı ve %100 temiz geçti.
+- **Etkilenen Sayfalar:** [[adr-006-windows-standalone-installer-and-ci]], [[cross-platform-installers]], [[pyinstaller-standalone-packaging]], [[inno-setup-installer]], [[github-actions-release-workflow]], [[index]], [[log]]
+
 

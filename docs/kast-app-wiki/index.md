@@ -27,6 +27,7 @@ Proje, sıralı kitap bölümleri yerine fonksiyonel mimari rollere ve Obsidian 
 - [[adr-003-native-table-grid-generation]] — Word ve OnlyOffice ile tam uyumlu `w:tcBorders` (Table Grid), satır bölünme koruması (`w:cantSplit`) ve dinamik font mirası.
 - [[adr-004-hybrid-launcher-and-dual-ui]] — Argümansız çağrılarda görsel Textual TUI'yi, parametreli çağrılarda doğrudan CLI modunu başlatan hibrit mimari.
 - [[adr-005-qt6-windows-studio-gui]] — Windows stüdyo ortamları için PySide6 tabanlı stüdyo temalı, sürükle-bırak destekli ve QThread iş parçacıklı masaüstü GUI mimarisi.
+- [[adr-006-windows-standalone-installer-and-ci]] — Windows için PyInstaller klasör demeti, Inno Setup akıllı ofis tespiti (Word/LibreOffice sessiz kurulumu) ve GitHub Actions CI/CD yayın mimarisi.
 
 ---
 
@@ -75,6 +76,9 @@ Proje, sıralı kitap bölümleri yerine fonksiyonel mimari rollere ve Obsidian 
 - [[hybrid-cli-dispatcher]] — `kast.py` komut satırı argümanları, bayraklar (`--count`, `--in-place`, `--pdf`, `--standalone`) ve orkestrasyon.
 - [[terminal-user-interface]] — Textual tabanlı koyu temalı TUI, sürükle-bırak girdi temizliği, yerel dosya seçiciler ve canlı log.
 - [[qt6-desktop-gui]] — PySide6 tabanlı stüdyo sınıfı masaüstü GUI, StudioTheme koyu paleti, DropZoneWidget ve ExtractionWorker mimarisi.
+- [[pyinstaller-standalone-packaging]] — Bağımsız Windows PyInstaller paketleme (`kast.spec`), konsolsuz giriş noktası (`run_gui.py`) ve çoklu çözünürlüklü ikon üretici (`generate_icon.py`).
+- [[inno-setup-installer]] — Inno Setup 6 kurulum sihirbazı (`installer.iss`), sistemde Word/LibreOffice arayan Pascal scriptleri ve sessiz LibreOffice kurulumu.
+- [[github-actions-release-workflow]] — Windows ikili ve kurulum paketlerini derleyip GitHub Releases üzerinde yayımlayan tam otomatik CI/CD iş akışı (`release-windows.yml`).
 - [[cross-platform-installers]] — Linux (`install.sh`), Windows (`install.ps1`, `install.bat`) ve kabuk başlatıcıları (`bin/kast`, `kast.cmd`).
 
 ---

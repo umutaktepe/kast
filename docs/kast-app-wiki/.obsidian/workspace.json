@@ -11,10 +11,14 @@
             "id": "bd5affc0caa756fd",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "architecture-decisions/adr-005-qt6-windows-studio-gui.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "adr-005-qt6-windows-studio-gui"
             }
           }
         ]
@@ -182,5 +186,11 @@
     }
   },
   "active": "bd5affc0caa756fd",
-  "lastOpenFiles": []
+  "lastOpenFiles": [
+    "architecture-decisions/adr-004-hybrid-launcher-and-dual-ui.md",
+    "architecture-decisions/adr-003-native-table-grid-generation.md",
+    "architecture-decisions/adr-002-strict-pdf-pagination-flow.md",
+    "architecture-decisions/adr-001-openxml-tab-based-parsing.md",
+    "core-models/character-stats.md"
+  ]
 }

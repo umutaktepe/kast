@@ -1,0 +1,82 @@
+# -*- mode: python ; coding: utf-8 -*-
+"""packaging/kast.spec — PyInstaller bundle specification for Kast Studio Windows Edition."""
+
+import os
+import sys
+
+SPECPATH = globals().get("SPECPATH", os.path.abspath(os.path.dirname(__file__)))
+ROOT_DIR = os.path.abspath(os.path.join(SPECPATH, ".."))
+
+block_cipher = None
+
+datas = [
+    (os.path.join(ROOT_DIR, "docs"), "docs"),
+    (os.path.join(ROOT_DIR, "example"), "example"),
+    (os.path.join(SPECPATH, "assets"), os.path.join("packaging", "assets")),
+]
+
+hiddenimports = [
+    "PySide6.QtCore",
+    "PySide6.QtGui",
+    "PySide6.QtWidgets",
+    "docx",
+    "pdfplumber",
+    "pypdf",
+    "PIL",
+]
+
+excludes = [
+    "tkinter",
+    "matplotlib",
+    "scipy",
+    "notebook",
+    "IPython",
+]
+
+a = Analysis(
+    [os.path.join(SPECPATH, "run_gui.py")],
+    pathex=[ROOT_DIR],
+    binaries=[],
+    datas=datas,
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=excludes,
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name="KastStudio",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=os.path.join(SPECPATH, "assets", "kast.ico"),
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name="KastStudio",
+)
