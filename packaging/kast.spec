@@ -16,9 +16,12 @@ block_cipher = None
 
 datas = [
     (os.path.join(ROOT_DIR, "docs"), "docs"),
-    (os.path.join(ROOT_DIR, "example"), "example"),
     (os.path.join(SPECPATH, "assets"), os.path.join("packaging", "assets")),
 ]
+
+example_dir = os.path.join(ROOT_DIR, "example")
+if os.path.isdir(example_dir):
+    datas.append((example_dir, "example"))
 
 hiddenimports = [
     "PySide6.QtCore",
