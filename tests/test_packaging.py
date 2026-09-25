@@ -122,6 +122,7 @@ def test_kast_spec_syntax():
     assert "docx" in content
     assert "pdfplumber" in content
     assert "tkinter" in content
+    assert "icuuc.dll" in content
 
 
 def test_gui_window_has_icon(qapp):

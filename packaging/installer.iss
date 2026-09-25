@@ -1,7 +1,7 @@
 ; packaging/installer.iss — Kast 2.0 Windows Studio Edition Inno Setup Scripti
 #define MyAppName "Kast Studio"
 #ifndef MyAppVersion
-#define MyAppVersion "2.1.0"
+#define MyAppVersion "2.1.1"
 #endif
 #define MyAppPublisher "Umut Aktepe"
 #define MyAppURL "https://github.com/umutaktepe/Kast"

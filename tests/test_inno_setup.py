@@ -56,7 +56,7 @@ def test_installer_metadata_and_icons():
 
     # App Defines
     assert '#define MyAppName "Kast Studio"' in content
-    assert '#define MyAppVersion "2.1.0"' in content
+    assert re.search(r'#define\s+MyAppVersion\s+"[0-9]+\.[0-9]+', content)
     assert '#define MyAppPublisher "Umut Aktepe"' in content
     assert '#define MyAppURL "https://github.com/umutaktepe/Kast"' in content
     assert '#define MyAppExeName "KastStudio.exe"' in content

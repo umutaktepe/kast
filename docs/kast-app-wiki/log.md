@@ -207,4 +207,16 @@ Bu dosya, Andrej Karpathy'nin LLM Wiki prensiplerine uygun olarak kronolojik ve 
   - Living Architecture graf hijyeni (kırık link ve yetim sayfa denetimi) çalıştırıldı ve %100 temiz geçti.
 - **Etkilenen Sayfalar:** [[adr-006-windows-standalone-installer-and-ci]], [[cross-platform-installers]], [[pyinstaller-standalone-packaging]], [[inno-setup-installer]], [[github-actions-release-workflow]], [[index]], [[log]]
 
+---
+
+## [2026-09-26] feat | Wine ve Eski Windows Sistemleri için ICU Kütüphanelerinin Pakete Dahil Edilmesi (v2.1.1)
+- **Ajan Rolü:** Paketleme ve Dağıtım Mühendisi
+- **Yapılan İşlem:**
+  - `packaging/kast.spec` güncellendi: Windows System32 altındaki `icuuc.dll` ve `icuin.dll` sistem kütüphaneleri `binaries` listesine eklenerek PyInstaller paketine dahil edildi.
+  - Wine (Linux) ortamında sanal system32 içerisinde `icuuc.dll` bulunmamasından kaynaklanan `ImportError: DLL load failed while importing QtCore` hatası giderildi.
+  - `tests/test_packaging.py` içine spec dosyasının `icuuc.dll` içerdiğini doğrulayan birim testi eklendi.
+  - Inno Setup varsayılan sürümü `2.1.1` olarak güncellendi.
+- **Etkilenen Sayfalar:** [[pyinstaller-standalone-packaging]], [[inno-setup-installer]], [[log]]
+
+
 

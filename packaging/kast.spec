@@ -41,10 +41,19 @@ excludes = [
     "IPython",
 ]
 
+# Windows 10/11 system-level Unicode libraries for Qt6 / Wine compatibility
+binaries = []
+if sys.platform == "win32":
+    system32 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")
+    for dll in ["icuuc.dll", "icuin.dll", "icudt.dll"]:
+        dll_path = os.path.join(system32, dll)
+        if os.path.isfile(dll_path):
+            binaries.append((dll_path, "."))
+
 a = Analysis(
     [os.path.join(SPECPATH, "run_gui.py")],
     pathex=[ROOT_DIR],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
