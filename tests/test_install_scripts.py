@@ -151,18 +151,29 @@ def test_install_ps1_word_and_libreoffice_checks():
     assert "--accept-source-agreements" in content, "install.ps1 should accept source agreements"
 
 
-def test_kast_gui_cmd_exists_and_contains_pyside_entrypoint():
-    """kast-gui.cmd başlatıcısının doğru Python ve GUI argümanlarını içerdiğini doğrular."""
-    assert os.path.exists("kast-gui.cmd")
-    with open("kast-gui.cmd", "r", encoding="utf-8", errors="ignore") as f:
+def test_kast_cmd_forwards_arguments_for_gui_and_cli():
+    """kast.cmd başlatıcısının tüm argümanları (%*) kast.py'ye ilettiğini doğrular."""
+    assert os.path.exists("kast.cmd")
+    with open("kast.cmd", "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
-    assert "--gui" in content or "src.gui" in content
+    assert "%*" in content
+    assert "kast.py" in content
 
 
-def test_install_ps1_generates_kast_gui_cmd():
-    """Verify install.ps1 generates kast-gui.cmd and lists it in completion message."""
+def test_install_ps1_generates_single_launcher_and_terminal_gui_instructions():
+    """Verify install.ps1 generates only kast.cmd (no extra app) and lists kast --gui."""
     with open(INSTALL_PS1, "r", encoding="utf-8") as f:
         content = f.read()
-    assert "kast-gui.cmd" in content
-    assert "kast-gui" in content
+    assert "kast.cmd" in content
+    assert "kast-gui.cmd" not in content, "install.ps1 should not create extra kast-gui.cmd launcher"
+    assert "kast --gui" in content
+    assert "PySide6" in content
+
+
+def test_install_sh_checks_pyside6_and_terminal_gui_instructions():
+    """Verify install.sh checks PySide6 dependency and lists kast --gui in completion message."""
+    with open(INSTALL_SH, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "PySide6" in content, "install.sh should check for PySide6"
+    assert "kast --gui" in content, "install.sh should inform user about kast --gui"
 

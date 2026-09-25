@@ -70,7 +70,7 @@ def test_drop_zone_widget_mockup_elements(qapp):
     from src.gui import DropZoneWidget
 
     widget = DropZoneWidget()
-    assert "Microsoft Word veya metin formatlı senaryo PDF'leri" in widget.lbl_subprompt.text()
+    assert "Microsoft Word veya metin formatlı çeviri PDF'leri" in widget.lbl_subprompt.text()
     assert widget.badge_docx.text() == ".DOCX"
     assert widget.badge_pdf.text() == ".PDF"
     assert "Dosya Seç" in widget.btn_browse.text()
@@ -216,8 +216,8 @@ def test_drop_zone_widget_open_file_dialog(qapp, tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         QFileDialog,
-        "getOpenFileName",
-        lambda *args, **kwargs: (str(fake_file), "PDF Belgeleri (*.pdf)"),
+        "getOpenFileNames",
+        lambda *args, **kwargs: ([str(fake_file)], "PDF Belgeleri (*.pdf)"),
     )
 
     widget._open_file_dialog()
@@ -564,7 +564,7 @@ def test_kast_studio_window_start_extraction_options(qapp, tmp_path, monkeypatch
     def mock_start(worker_self):
         worker_created.append(worker_self)
 
-    monkeypatch.setattr("src.gui.ExtractionWorker.start", mock_start)
+    monkeypatch.setattr("src.gui.BatchExtractionWorker.start", mock_start)
 
     window._start_extraction()
 
@@ -685,5 +685,453 @@ def test_launch_gui(monkeypatch):
     assert len(shown) == 1
 
 
+def test_drop_zone_widget_multi_file_validation_success(qapp, tmp_path):
+    """DropZoneWidget homojen birden fazla dosyayı başarıyla doğrular ve listeye alır."""
+    from src.gui import DropZoneWidget
+
+    widget = DropZoneWidget()
+    f1 = tmp_path / "part1.docx"
+    f2 = tmp_path / "part2.docx"
+    f1.write_text("dummy1")
+    f2.write_text("dummy2")
+
+    emitted_files = []
+    widget.files_selected.connect(lambda files: emitted_files.append(files))
+
+    ok = widget.set_files([str(f1), str(f2)])
+    assert ok is True
+    assert widget.get_files() == [str(f1), str(f2)]
+    assert widget.get_file_path() == str(f1)  # Geriye dönük uyumluluk
+    assert len(emitted_files) == 1
+    assert emitted_files[0] == [str(f1), str(f2)]
 
 
+def test_drop_zone_widget_mixed_file_types_rejected(qapp, tmp_path):
+    """DropZoneWidget karışık uzantılı dosya seçimlerini (.docx + .pdf) reddeder ve validation_error sinyali yayar."""
+    from src.gui import DropZoneWidget
+
+    widget = DropZoneWidget()
+    docx_file = tmp_path / "part1.docx"
+    pdf_file = tmp_path / "part2.pdf"
+    docx_file.write_text("docx")
+    pdf_file.write_text("pdf")
+
+    errors = []
+    widget.validation_error.connect(lambda err: errors.append(err))
+
+    ok = widget.set_files([str(docx_file), str(pdf_file)])
+    assert ok is False
+    assert widget.get_files() == []
+    assert len(errors) == 1
+    assert "aynı türden" in errors[0]
+
+
+def test_drop_zone_widget_max_files_limit_rejected(qapp, tmp_path):
+    """DropZoneWidget 25'ten fazla dosya verildiğinde seçimi reddeder ve hata mesajı üretir."""
+    from src.gui import DropZoneWidget
+
+    widget = DropZoneWidget()
+    files = []
+    for i in range(26):
+        f = tmp_path / f"part_{i}.docx"
+        f.write_text("content")
+        files.append(str(f))
+
+    errors = []
+    widget.validation_error.connect(lambda err: errors.append(err))
+
+    ok = widget.set_files(files)
+    assert ok is False
+    assert widget.get_files() == []
+    assert len(errors) == 1
+    assert "En fazla 25 dosya" in errors[0]
+
+
+def test_drop_zone_widget_unsupported_extensions_rejected(qapp, tmp_path):
+    """DropZoneWidget desteklenmeyen uzantılı dosyaları (.txt, .xlsx) reddeder."""
+    from src.gui import DropZoneWidget
+
+    widget = DropZoneWidget()
+    txt_file = tmp_path / "notes.txt"
+    txt_file.write_text("notes")
+
+    errors = []
+    widget.validation_error.connect(lambda err: errors.append(err))
+
+    ok = widget.set_files([str(txt_file)])
+    assert ok is False
+    assert widget.get_files() == []
+    assert len(errors) == 1
+    assert "Desteklenmeyen dosya formatı" in errors[0]
+
+
+def test_drop_zone_widget_multi_file_visual_state(qapp, tmp_path):
+    """DropZoneWidget çoklu dosya seçildiğinde rozet metnini ve toplam boyut bilgisini doğru görüntüler."""
+    from src.gui import DropZoneWidget
+
+    widget = DropZoneWidget()
+    f1 = tmp_path / "film_part1.docx"
+    f2 = tmp_path / "film_part2.docx"
+    f3 = tmp_path / "film_part3.docx"
+    for f in (f1, f2, f3):
+        f.write_bytes(b"0" * 2048)
+
+    widget.set_files([str(f1), str(f2), str(f3)])
+
+    assert "DOCX (3 Dosya)" in widget.lbl_badge.text()
+    assert "3 adet çeviri dosyası hazır" in widget.lbl_filename.text()
+    assert "KB" in widget.lbl_filesize.text()
+    assert str(widget.lbl_filename.toolTip()).count("film_part") == 3
+
+
+def test_drop_zone_widget_multi_file_drag_and_drop(qapp, tmp_path):
+    """DropZoneWidget çoklu dosya sürükle-bırak olaylarını kabul eder ve dosyaları yükler."""
+    from PySide6.QtCore import QPoint, QUrl, QMimeData, Qt
+    from PySide6.QtGui import QDropEvent
+    from src.gui import DropZoneWidget
+
+    widget = DropZoneWidget()
+    f1 = tmp_path / "part1.pdf"
+    f2 = tmp_path / "part2.pdf"
+    f1.write_text("pdf1")
+    f2.write_text("pdf2")
+
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(f1)), QUrl.fromLocalFile(str(f2))])
+
+    drop_event = QDropEvent(
+        QPoint(10, 10),
+        Qt.CopyAction,
+        mime,
+        Qt.LeftButton,
+        Qt.NoModifier,
+    )
+    widget.dropEvent(drop_event)
+
+    assert drop_event.isAccepted()
+    assert len(widget.get_files()) == 2
+    assert "PDF (2 Dosya)" in widget.lbl_badge.text()
+
+
+def test_drop_zone_widget_dialog_multi_selection(qapp, tmp_path, monkeypatch):
+    """_open_file_dialog çağrıldığında getOpenFileNames sonucunu set_files ile yükler."""
+    from PySide6.QtWidgets import QFileDialog
+    from src.gui import DropZoneWidget
+
+    widget = DropZoneWidget()
+    f1 = tmp_path / "scene1.docx"
+    f2 = tmp_path / "scene2.docx"
+    f1.write_text("d1")
+    f2.write_text("d2")
+
+    monkeypatch.setattr(
+        QFileDialog,
+        "getOpenFileNames",
+        lambda *args, **kwargs: ([str(f1), str(f2)], "Dublaj Çevirileri (*.docx *.pdf)"),
+    )
+
+    widget._open_file_dialog()
+    assert len(widget.get_files()) == 2
+    assert widget.get_files() == [str(f1), str(f2)]
+
+
+def test_drop_zone_widget_order_preserving_deduplication(qapp, tmp_path):
+    """DropZoneWidget yinelenen dosya yollarını sırasını koruyarak tekilleştirir."""
+    from src.gui import DropZoneWidget
+
+    widget = DropZoneWidget()
+    f1 = tmp_path / "a.docx"
+    f2 = tmp_path / "b.docx"
+    f1.write_text("a")
+    f2.write_text("b")
+
+    ok = widget.set_files([str(f1), str(f2), str(f1), str(f2)])
+    assert ok is True
+    assert widget.get_files() == [str(f1), str(f2)]
+
+
+def test_batch_extraction_worker_sequential_execution(tmp_path, monkeypatch):
+    """BatchExtractionWorker birden fazla dosyayı sırayla işler, ilerleme yüzdesini düzgün yayar ve tümünü tamamlar."""
+    import src.gui as gui_mod
+    from src.gui import BatchExtractionWorker
+    from src.models import CastExtractionResult, CharacterStats
+
+    char = CharacterStats(name="DENEME", first_seen_order=1, line_count=5, pages={1})
+    dummy_res = CastExtractionResult(characters=[char], total_lines=5, total_pages=1)
+
+    processed_files = []
+
+    def mock_process_dubbing_file(file_path, output_path=None, sort_by="appearance", in_place=False, standalone=True, progress_callback=None):
+        processed_files.append(file_path)
+        if progress_callback:
+            progress_callback(50, "Ayrıştırılıyor...")
+        out = output_path or f"{file_path}_kast.docx"
+        return out, dummy_res
+
+    monkeypatch.setattr(gui_mod, "process_dubbing_file", mock_process_dubbing_file)
+
+    f1 = tmp_path / "ep1.docx"
+    f2 = tmp_path / "ep2.docx"
+    f1.write_text("ep1")
+    f2.write_text("ep2")
+
+    worker = BatchExtractionWorker(
+        file_paths=[str(f1), str(f2)],
+        sort_by="appearance",
+        in_place=False,
+        standalone=True,
+    )
+
+    progress_events = []
+    completed_events = []
+    all_summary = []
+
+    worker.progress.connect(lambda pct, msg: progress_events.append((pct, msg)))
+    worker.file_completed.connect(lambda idx, tot, out, res: completed_events.append((idx, tot, out)))
+    worker.all_finished.connect(lambda summary: all_summary.extend(summary))
+
+    worker.run()
+
+    # Dosyaların sırayla işlendiğini doğrula
+    assert processed_files == [str(f1), str(f2)]
+    assert len(completed_events) == 2
+    assert completed_events[0] == (1, 2, f"{f1}_kast.docx")
+    assert completed_events[1] == (2, 2, f"{f2}_kast.docx")
+    assert len(all_summary) == 2
+    assert all_summary[0]["status"] == "success"
+    assert all_summary[1]["status"] == "success"
+    # İlerleme %100'e ulaşmalı
+    assert progress_events[-1][0] == 100
+
+
+def test_batch_extraction_worker_fault_tolerance(tmp_path, monkeypatch):
+    """BatchExtractionWorker bir dosyada hata çıkarsa durmaz; hatayı kaydeder ve sonraki dosyayı işlemeye devam eder."""
+    import src.gui as gui_mod
+    from src.gui import BatchExtractionWorker
+    from src.models import CastExtractionResult
+
+    def mock_process_dubbing_file(file_path, **kwargs):
+        if "corrupt" in file_path:
+            raise ValueError("Bozuk XML yapısı!")
+        return f"{file_path}_kast.docx", CastExtractionResult([], 0, 1)
+
+    monkeypatch.setattr(gui_mod, "process_dubbing_file", mock_process_dubbing_file)
+
+    f1 = tmp_path / "corrupt.docx"
+    f2 = tmp_path / "valid.docx"
+    f1.write_text("bad")
+    f2.write_text("good")
+
+    worker = BatchExtractionWorker(
+        file_paths=[str(f1), str(f2)],
+        sort_by="count",
+        in_place=False,
+        standalone=True,
+    )
+
+    error_events = []
+    all_summary = []
+    worker.file_error.connect(lambda idx, tot, path, err: error_events.append((idx, tot, path, err)))
+    worker.all_finished.connect(lambda summary: all_summary.extend(summary))
+
+    worker.run()
+
+    assert len(error_events) == 1
+    assert "Bozuk XML" in error_events[0][3]
+    assert len(all_summary) == 2
+    assert all_summary[0]["status"] == "error"
+    assert all_summary[1]["status"] == "success"
+
+
+def test_kast_studio_window_multi_file_flow(qapp, tmp_path, monkeypatch):
+    """KastStudioWindow çoklu dosya seçildiğinde PDF/DOCX kontrollerini ayarlar, worker'ı başlatır ve sonuç özetini gösterir."""
+    import src.gui as gui_mod
+    from src.gui import KastStudioWindow
+    from src.models import CastExtractionResult, CharacterStats
+
+    window = KastStudioWindow()
+    window.show()
+
+    f1 = tmp_path / "part1.docx"
+    f2 = tmp_path / "part2.docx"
+    f1.write_text("part1")
+    f2.write_text("part2")
+
+    window.drop_zone.set_files([str(f1), str(f2)])
+
+    assert window.btn_extract.isEnabled()
+    assert "[BİLGİ] 2 adet DOCX" in window.log_area.toPlainText()
+
+    # Worker.start metodunu yakala
+    worker_instances = []
+    monkeypatch.setattr(gui_mod.BatchExtractionWorker, "start", lambda self: worker_instances.append(self))
+
+    window._start_extraction()
+    assert len(worker_instances) == 1
+    worker = worker_instances[0]
+    assert worker.file_paths == [str(f1), str(f2)]
+
+    # Worker tamamlandığında sonuç kartı güncellemesi
+    dummy_summary = [
+        {"path": str(f1), "output": str(tmp_path / "part1_kast.docx"), "status": "success", "result": CastExtractionResult([CharacterStats("ALİ", 1, 10, {1})], 10, 1)},
+        {"path": str(f2), "output": str(tmp_path / "part2_kast.docx"), "status": "success", "result": CastExtractionResult([CharacterStats("VELİ", 1, 5, {1})], 5, 1)},
+    ]
+    window._on_batch_finished(dummy_summary)
+
+    assert window.result_card.isVisible()
+    assert "2/2 dosya başarıyla oluşturuldu" in window.lbl_result_text.text()
+    assert "Toplam: 2 Karakter • 15 Replik" in window.lbl_result_text.text()
+
+
+def test_kast_studio_window_validation_error_displayed(qapp, tmp_path):
+    """KastStudioWindow doğrulama hatası sinyali aldığında log paneline kırmızı hata basar ve durumu günceller."""
+    from src.gui import KastStudioWindow
+
+    window = KastStudioWindow()
+    window.show()
+
+    f_docx = tmp_path / "part1.docx"
+    f_pdf = tmp_path / "part2.pdf"
+    f_docx.write_text("d")
+    f_pdf.write_text("p")
+
+    window.drop_zone.set_files([str(f_docx), str(f_pdf)])
+
+    assert "Doğrulama Hatası" in window.lbl_status.text()
+    assert "aynı türden dosyalar" in window.log_area.toPlainText()
+    assert not window.btn_extract.isEnabled()
+
+
+def test_drop_zone_widget_exact_25_files_allowed(qapp, tmp_path):
+    """DropZoneWidget tam 25 dosya sınır değerini kabul eder ve tüm dosyaları başarıyla yükler."""
+    from src.gui import DropZoneWidget
+
+    widget = DropZoneWidget()
+    files = []
+    for i in range(25):
+        f = tmp_path / f"part_{i:02d}.docx"
+        f.write_text(f"content {i}")
+        files.append(str(f))
+
+    emitted_files = []
+    widget.files_selected.connect(lambda paths: emitted_files.append(paths))
+
+    ok = widget.set_files(files)
+    assert ok is True
+    assert len(widget.get_files()) == 25
+    assert widget.get_files() == files
+    assert len(emitted_files) == 1
+    assert emitted_files[0] == files
+    assert "DOCX (25 Dosya)" in widget.lbl_badge.text()
+    assert "25 adet çeviri dosyası hazır" in widget.lbl_filename.text()
+
+
+def test_drop_zone_widget_empty_and_whitespace_paths(qapp, tmp_path):
+    """DropZoneWidget boş liste, boşluk karakterleri veya tırnak içeren dosya yollarını uygun şekilde işler/reddeder."""
+    from src.gui import DropZoneWidget
+
+    widget = DropZoneWidget()
+    errors = []
+    widget.validation_error.connect(lambda err: errors.append(err))
+
+    # 1. Boş liste
+    ok1 = widget.set_files([])
+    assert ok1 is False
+    assert len(errors) == 1
+    assert "Hiçbir dosya seçilmedi" in errors[-1]
+
+    # 2. Sadece boşluk veya tırnak içeren yollar
+    ok2 = widget.set_files(["", "   ", "  \t  ", "\n", "''", '""'])
+    assert ok2 is False
+    assert len(errors) == 2
+    assert "Hiçbir geçerli dosya yolu belirtilmedi" in errors[-1]
+
+    # 3. Geçerli yolların etrafındaki boşluk ve tırnakların temizlenmesi ve tekilleştirme
+    f1 = tmp_path / "clean_part1.docx"
+    f2 = tmp_path / "clean_part2.docx"
+    f1.write_text("clean1")
+    f2.write_text("clean2")
+
+    ok3 = widget.set_files([
+        f"  '{str(f1)}'  ",
+        "",
+        "   ",
+        f'  "{str(f2)}"  ',
+        f"  {str(f1)}  ",  # Deduplication testi
+    ])
+    assert ok3 is True
+    assert widget.get_files() == [str(f1), str(f2)]
+    assert len(widget.get_files()) == 2
+
+
+def test_kast_studio_window_multi_file_partial_error_flow(qapp, tmp_path, monkeypatch):
+    """KastStudioWindow kısmi hata ve tam hata akışlarında buton, rozet ve durum metinlerini doğrular; doğrulama hatasının temizlendiğini test eder."""
+    import src.gui as gui_mod
+    from src.gui import KastStudioWindow
+    from src.models import CastExtractionResult, CharacterStats
+
+    window = KastStudioWindow()
+    window.show()
+
+    f1 = tmp_path / "p1.docx"
+    f2 = tmp_path / "p2.docx"
+    f_invalid = tmp_path / "invalid.pdf"
+    f1.write_text("p1")
+    f2.write_text("p2")
+    f_invalid.write_text("pdf")
+
+    # 1. Doğrulama hatası oluştur ve ardından geçerli dosyalarla durumun 'Hazır'a döndüğünü doğrula
+    window.drop_zone.set_files([str(f1), str(f_invalid)])
+    assert "Doğrulama Hatası" in window.lbl_status.text()
+    assert not window.btn_extract.isEnabled()
+
+    window.drop_zone.set_files([str(f1), str(f2)])
+    assert window.lbl_status.text() == "● Durum: Hazır"
+    assert window.btn_extract.isEnabled()
+
+    # 2. _start_extraction'ın last_output_file'ı sıfırladığını doğrula
+    window.last_output_file = str(tmp_path / "old_output.docx")
+    monkeypatch.setattr(gui_mod.BatchExtractionWorker, "start", lambda self: None)
+    window._start_extraction()
+    assert window.last_output_file is None
+
+    # 3. Kısmi Hata Durumu (1 Başarılı, 1 Hatalı)
+    partial_summary = [
+        {
+            "path": str(f1),
+            "output": str(tmp_path / "p1_kast.docx"),
+            "status": "success",
+            "result": CastExtractionResult([CharacterStats("DENEME", 1, 5, {1})], 5, 1),
+        },
+        {
+            "path": str(f2),
+            "error": "Bozuk XML yapısı",
+            "status": "error",
+        },
+    ]
+    window._on_batch_finished(partial_summary)
+
+    assert window.result_card.isVisible()
+    assert window.last_output_file == str(tmp_path / "p1_kast.docx")
+    assert window.btn_extract.isEnabled()
+    assert window.btn_clear.isEnabled()
+    assert "⚠️ Kısmi Tamamlandı: 1/2 başarılı, 1 dosyada hata oluştu." in window.lbl_result_text.text()
+    assert "1 hata" in window.lbl_status.text()
+    assert window.btn_open_file.text() == "📄 Son Dosyayı Aç"
+
+    # 4. Tam Başarısızlık Durumu (0 Başarılı, 2 Hatalı)
+    window._start_extraction()
+    assert window.last_output_file is None
+
+    fail_summary = [
+        {"path": str(f1), "error": "Hata 1", "status": "error"},
+        {"path": str(f2), "error": "Hata 2", "status": "error"},
+    ]
+    window._on_batch_finished(fail_summary)
+
+    assert window.result_card.isVisible()
+    assert window.last_output_file is None
+    assert window.btn_extract.isEnabled()
+    assert window.btn_clear.isEnabled()
+    assert "❌ İşlem Başarısız: 2/2 dosyada hata oluştu." in window.lbl_result_text.text()
+    assert "2 hata" in window.lbl_status.text()

@@ -66,7 +66,7 @@ fi
 
 # 3. Bağımlılıkların yüklenmesi
 echo -e "${BLUE}➜${NC} Bağımlılıklar kontrol ediliyor..."
-if "$VENV_DIR/bin/python3" -c "import docx, PIL, textual" >/dev/null 2>&1; then
+if "$VENV_DIR/bin/python3" -c "import docx, PIL, textual, PySide6" >/dev/null 2>&1; then
     echo -e "${GREEN}✓${NC} Gerekli tüm bağımlılıklar zaten sanal ortamda mevcut."
 else
     echo -e "${BLUE}➜${NC} Eksik paketler yükleniyor (requirements.txt)..."
@@ -107,6 +107,7 @@ echo -e "${GREEN}======================================================${NC}"
 if [ "$IN_PATH" -eq 1 ]; then
     echo -e "Artık herhangi bir terminal sekmesinden doğrudan:"
     echo -e "  ${YELLOW}kast${NC}              (Görsel TUI arayüzünü açar)"
+    echo -e "  ${YELLOW}kast --gui${NC}        (Modern Qt6 Studio GUI arayüzünü açar)"
     echo -e "  ${YELLOW}kast dosya.docx${NC}   (Hızlı komut satırı modunda çalıştırır)"
     echo -e "komutlarını kullanabilirsiniz."
 else

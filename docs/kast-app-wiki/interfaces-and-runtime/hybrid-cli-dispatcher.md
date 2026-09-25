@@ -30,9 +30,9 @@ if should_launch_tui:
     return launch_tui()
 ```
 
-- **`kast --gui` veya `kast -g` (veya `kast-gui.cmd`):** Doğrudan [[qt6-desktop-gui]] (Qt6 Modern Stüdyo Arayüzü) açılır.
+- **`kast --gui` veya `kast -g`:** Doğrudan [[qt6-desktop-gui]] (Qt6 Modern Stüdyo Arayüzü) açılır.
 - **`kast` (Argümansız):** Doğrudan [[terminal-user-interface]] açılır.
-- **`kast senaryo.docx [bayraklar]`:** TUI/GUI arayüzü başlatılmadan komut satırı boru hattı çalıştırılır.
+- **`kast dosya.docx [bayraklar]`:** TUI/GUI arayüzü başlatılmadan komut satırı boru hattı çalıştırılır.
 
 ## Komut Satırı Argümanları
 

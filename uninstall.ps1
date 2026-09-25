@@ -17,6 +17,12 @@ if (Test-Path $KastCmd) {
     Write-Host "[i] Baslatici ($KastCmd) bulunamadi veya zaten silinmis." -ForegroundColor Yellow
 }
 
+$KastGuiCmd = Join-Path $UserBin "kast-gui.cmd"
+if (Test-Path $KastGuiCmd) {
+    Remove-Item -Path $KastGuiCmd -Force
+    Write-Host "[OK] Eski GUI baslaticisi ($KastGuiCmd) basariyla silindi." -ForegroundColor Green
+}
+
 $RepoDir = $PSScriptRoot
 if (-not $RepoDir) {
     $RepoDir = Split-Path -Parent $MyInvocation.MyCommand.Path

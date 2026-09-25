@@ -218,5 +218,133 @@ Bu dosya, Andrej Karpathy'nin LLM Wiki prensiplerine uygun olarak kronolojik ve 
   - Inno Setup varsayılan sürümü `2.1.1` olarak güncellendi.
 - **Etkilenen Sayfalar:** [[pyinstaller-standalone-packaging]], [[inno-setup-installer]], [[log]]
 
+---
+
+## [2026-09-26] feat | DropZoneWidget Çoklu Dosya Doğrulama ve Durum Yönetimi (Task 1)
+- **Ajan Rolü:** Task 1 Kodlama ve TDD Ajanı
+- **Yapılan İşlem:**
+  - `DropZoneWidget` sınıfına çoklu dosya desteği için `MAX_FILES = 25`, `files_selected = Signal(list)` ve `validation_error = Signal(str)` eklendi.
+  - Sınıf seviyesinde `validate_file_paths(paths)` doğrulama metodu eklendi: boş dosya kontrolü, 25 dosya sınırı, yalnızca `.docx`/`.pdf` format desteği ve homojen tür zorunluluğu (aynı anda hem docx hem pdf reddi) getirildi.
+  - `set_files(paths)` ve `get_files()` çoklu dosya metotları ile geriye dönük uyumlu `set_file(path)` ve `get_file_path()` arayüzü kuruldu.
+  - TDD döngüsüyle 4 yeni birim testi yazıldı ve doğrulandı (`tests/test_gui.py`).
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
+
+---
+
+## [2026-09-26] feat | DropZoneWidget Çoklu Dosya Görsel Arayüzü ve Sürükle-Bırak Entegrasyonu (Task 2)
+- **Ajan Rolü:** Task 2 Kodlama ve TDD Ajanı
+- **Yapılan İşlem:**
+  - `DropZoneWidget` sınıfı çoklu dosya seçimi ve sürükle-bırak desteğiyle zenginleştirildi (`QFileDialog.getOpenFileNames`).
+  - Dinamik rozet (`DOCX (N Dosya)` / `PDF (N Dosya)`), toplam dosya boyutu hesaplaması ve tooltip dosya listesi eklendi.
+  - Sıralı tekilleştirme (`dict.fromkeys`) entegre edildi.
+  - 4 yeni birim testi yazıldı ve doğrulandı (`tests/test_gui.py`).
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
+
+---
+
+## [2026-09-26] feat | Kaynak Güvenli ve Sıralı Toplu İşleme Motoru (BatchExtractionWorker) (Task 3)
+- **Ajan Rolü:** Task 3 Kodlama ve TDD Ajanı
+- **Yapılan İşlem:**
+  - `src/gui.py` içerisine birden fazla senaryoyu (en fazla 25) sırayla (concurrency = 1) işleyen `BatchExtractionWorker(QThread)` eklendi.
+  - LibreOffice ve Word COM kilitlenmelerini önleyen sıralı yürütme mimarisi kuruldu.
+  - Sinyal seti entegre edildi: `progress`, `log`, `file_started`, `file_completed`, `file_error`, `all_finished`.
+  - Hata toleransı (Fault tolerance) sağlandı: Tek bir dosyadaki hata diğer dosyaların işlenmesini durdurmaz, hatayı kaydedip özet tablosuna ekler.
+  - Geriye dönük uyumluluk için `ExtractionWorker` sınıfı `BatchExtractionWorker` üzerinden türetildi; `finished` ve `error` sinyalleri ile `is_single_compat` modu korundu.
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
+
+---
+
+## [2026-09-26] feat | KastStudioWindow Çoklu Dosya Entegrasyonu ve Sonuç Ekranı (Task 4)
+- **Ajan Rolü:** Task 4 Kodlama ve TDD Ajanı
+- **Yapılan İşlem:**
+  - `KastStudioWindow` sınıfı çoklu dosya seçimi ve toplu işleme için `DropZoneWidget.files_selected` ve `DropZoneWidget.validation_error` sinyallerine bağlandı.
+  - `_on_files_selected(file_paths)` metoduyla 1 vs N dosya senaryolarına uygun terminal günlüğü ve in-place/standalone çıktı kuralları uyarlandı.
+  - `_on_validation_error(err_msg)` metoduyla geçersiz dosya veya karma uzantı seçimlerinde kırmızı hata mesajı ve durum bildirimi sağlandı.
+  - `_start_extraction()` fonksiyonu `BatchExtractionWorker` kullanacak şekilde güncellendi; `self.worker = self.batch_worker` ile geriye dönük uyumluluk korundu.
+  - `_on_batch_finished(summary)` metodu eklenerek toplu sonuç kartı (`result_card`) zenginleştirildi: Tam başarıda yeşil rozet, kısmi hatalarda sarı uyarı kartı; toplam karakter ve replik istatistikleri; çoklu dosyada `"📄 Son Dosyayı Aç"` butonu dinamizmi sağlandı.
+  - TDD döngüsüyle `test_kast_studio_window_multi_file_flow` ve `test_kast_studio_window_validation_error_displayed` birim testleri yazıldı ve 35 testin tamamı offscreen Qt üzerinde doğrulandı.
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
+
+---
+
+## [2026-09-26] test | Tüm GUI Test Paketinin Doğrulanması ve Regresyon Testleri (Task 5)
+- **Ajan Rolü:** Task 5 Kodlama ve TDD/QA Ajanı
+- **Yapılan İşlem:**
+  - `src/gui.py` cilalama maddeleri tamamlandı:
+    - `KastStudioWindow._on_files_selected` içine geçerli dosya seçiminde önceki hata durumunu sıfırlayan `self.lbl_status.setText("● Durum: Hazır")` eklendi.
+    - `KastStudioWindow._start_extraction` başlangıcına önceki çalışmanın çıktısını temizleyen `self.last_output_file = None` eklendi.
+    - `KastStudioWindow._on_batch_finished` içinde tüm dosyaların başarısız olduğu senaryo (`len(successes) == 0`) kırmızı rozet ve `❌ İşlem Başarısız: {len(errors)}/{total} dosyada hata oluştu.` formatıyla ele alındı.
+  - `tests/test_gui.py` içine 3 yeni regresyon ve sınır değer testi eklendi:
+    - `test_drop_zone_widget_exact_25_files_allowed`: 25 tam sınır dosya kabulü.
+    - `test_drop_zone_widget_empty_and_whitespace_paths`: Boş liste, boşluk, tırnak temizleme ve tekilleştirme.
+    - `test_kast_studio_window_multi_file_partial_error_flow`: Kısmi hata (1/2), tam hata (0/2) ve doğrulama hatası sıfırlama akışı.
+  - Dosya sonundaki gereksiz boşluk satırları temizlendi.
+  - Tüm GUI test paketi (38 test) ve tüm proje test paketi (169 geçen, 14 atlanan) %100 başarıyla doğrulandı.
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
+
+---
+
+## [2026-09-26] docs | ADR-007 Çoklu Dosya Toplu İşleme Mimarisi ve Wiki Dokümantasyonu (Task 6)
+- **Ajan Rolü:** Task 6 Living Architecture ve Dokümantasyon Ajanı
+- **Yapılan İşlem:**
+  - `adr-007-batch-file-processing-pipeline.md` mimari karar kaydı yayımlandı:
+    - 25 dosya sınırı (`MAX_FILES = 25`), homojen dosya uzantı kuralı (`.docx` veya `.pdf`), sıralı yürütme (`concurrency = 1`) mimarisi (LibreOffice soffice profil kilitleri, Word COM STA kilitlenmeleri ve CPU/RAM tükenme koruması) ve dosya bazında hata toleransı (`per-file fault tolerance`) belgelendi.
+    - Zorunlu 5 bölüm (Bağlam, Karar, Alternatifler, Sonuçlar ve Etkiler, İlgili Sayfalar) eksiksiz uygulandı.
+  - `qt6-desktop-gui.md` bileşen dokümantasyonu güncellendi:
+    - `DropZoneWidget`: Çoklu dosya sürükle-bırak, yerel dosya seçici (`QFileDialog.getOpenFileNames`), yol temizliği/tekilleştirme, homojenlik doğrulaması (`validate_file_paths`), dinamik rozetler (`DOCX/PDF (N Dosya)`), tooltip dosya listesi ve kümülatif boyut gösterimi işlendi.
+    - `BatchExtractionWorker`: Sıralı yürütme mimarisi, sinyal sözleşmesi (`progress`, `log`, `file_started`, `file_completed`, `file_error`, `all_finished`), ilerleme matematiği (dilim bazlı monoton artan formül), hata izolasyonu ve `ExtractionWorker` geriye dönük uyumluluğu belgelendi.
+    - `KastStudioWindow`: Çoklu dosya seçimi ve hata akışları (`_on_files_selected`, `_on_validation_error`, `_start_extraction`), 3 durumlu dinamik sonuç kartı (`result_card`: tam başarı, kısmi hata, tam başarısızlık) ve `"📄 Son Dosyayı Aç"` buton dinamizmi eklendi.
+  - Fihrist (`index.md`) güncellenerek ADR-007 kaydı MOC listesine eklendi.
+  - Yaşayan mimari graf hijyeni (kırık wikilink ve yetim sayfa denetimi) çalıştırıldı ve %100 temiz geçti.
+- **Etkilenen Sayfalar:** [[adr-007-batch-file-processing-pipeline]], [[qt6-desktop-gui]], [[index]], [[log]]
+
+---
+
+## [2026-09-26] refactor | UI Terminoloji Güncellemesi: 'Senaryo' -> 'Çeviri'
+- **Ajan Rolü:** UI ve Kullanıcı Deneyimi Ajanı
+- **Yapılan İşlem:**
+  - Dublaj stüdyolarının çalışma pratiklerine uygun olarak arayüzdeki "senaryo" terimleri "çeviri" / "çeviri dosyası" / "çeviri metni" olarak güncellendi:
+    - Çoklu dosya seçildiğinde DropZoneWidget başlığı `"X adet senaryo dosyası hazır"` yerine `"X adet çeviri dosyası hazır"` olarak güncellendi.
+    - Sürükle-bırak boş durum etiketleri: `"Çeviri dosyasını (.docx veya .pdf) buraya sürükleyip bırakın"` ve `"Microsoft Word veya metin formatlı çeviri PDF'leri desteklenmektedir."`.
+    - Dosya seçici başlığı ve filtreleri: `"Dublaj Çeviri Dosyaları Seçin (En Fazla 25 Dosya)"` ve `"Dublaj Çevirileri (*.docx *.pdf)..."`.
+    - Ana pencere alt başlığı: `"Çeviri belgelerindeki diyalogları ve karakter listesini otomatik analiz eder."`.
+    - Terminal logları: `"[*] Toplu işlem başlatıldı: Toplam N çeviri dosyası işlenecek."` ve `"[BİLGİ] N adet PDF/DOCX çevirisi algılandı."`.
+  - `tests/test_gui.py` birim testlerindeki ilgili assertion metinleri senkronize edildi.
+  - 38 GUI testi ve 169 proje testinin tamamı başarıyla doğrulandı.
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
+
+---
+
+## [2026-09-26] refactor | Kurulum Betiklerinin Birleştirilmesi ve Terminal 'kast --gui' Standardı
+- **Ajan Rolü:** Runtime & Dağıtım Ajanı
+- **Yapılan İşlem:**
+  - `install.bat` / `install.ps1`:
+    - Fazladan oluşturulan `kast-gui.cmd` başlatıcısı kaldırıldı; yalnızca tekil `%USERPROFILE%\bin\kast.cmd` üretilecek şekilde sadeleştirildi.
+    - Kurulum sonu talimatları terminalden `kast` (TUI), `kast --gui` (Qt6 Studio GUI) ve `kast dosya.docx` (CLI) yönlendirmesiyle güncellendi.
+    - `uninstall.ps1` içine olası eski `kast-gui.cmd` dosyalarını temizleyen kontrol eklendi.
+  - `install.sh`:
+    - Bağımlılık kontrolüne `PySide6` eklendi (`docx, PIL, textual, PySide6`).
+    - Kurulum sonu talimatlarına `kast --gui` eklendi.
+  - Bağımsız masaüstü GUI dağıtım prensibi korundu: Python gerektirmeyen son kullanıcı deneyimi için Inno Setup (`Kast-Setup.exe`) ve PyInstaller (`Kast-Portable.zip`) paketlerinin yetkili dağıtım kanalı olduğu tescillendi.
+  - `tests/test_install_scripts.py` güncellenerek tekil `kast.cmd` argüman aktarımı (`%*`), `kast-gui.cmd` üretilmeme kuralı, `install.sh` PySide6 kontrolü ve `kast --gui` talimatları test edildi.
+  - 170 testin tamamı (ve 38 GUI testi) %100 yeşil doğrulandı.
+- **Etkilenen Sayfalar:** [[cross-platform-installers]], [[hybrid-cli-dispatcher]], [[qt6-desktop-gui]], [[log]]
+
+---
+
+## [2026-09-26] docs | AGENTS.md TypeSafe AI Kural Setinin Ajan Karar Protokolü Olarak Düzeltilmesi
+- **Ajan Rolü:** Living Architecture ve Yönetişim Ajanı
+- **Yapılan İşlem:**
+  - `AGENTS.md` Madde 5 tamamen revize edildi:
+    - TypeSafe AI'ın Kast masaüstü uygulamasına gömülü bir runtime kütüphanesi değil, geliştirme yapan **yapay zeka ajanının (AI Coding Agent)** karar destek primitifi (`Choice`, `Score`, `Noul`) olduğu netleştirildi.
+    - Ajanın bu skill'i doğrudan tetikleyeceği 4 somut mühendislik senaryosu tanımlandı:
+      1. Mimari alternatif ve tasarım seçimi (ADR & Planning - `Choice`).
+      2. Kritik modüllerde regresyon ve kırılma riski puanlama (`Score`).
+      3. Living Architecture ve wiki kural çelişki denetimi (`Noul`).
+      4. Karmaşık hata ve uç vaka kök neden sınıflandırması (`Choice`).
+    - Madde 1 altındaki `core-models` tanımından ve Madde 2 altındaki ADR kütüphane örneklerinden yanlış gömülü TypeSafe ifadeleri temizlendi.
+- **Etkilenen Sayfalar:** `AGENTS.md`, [[log]]
+
+
 
 

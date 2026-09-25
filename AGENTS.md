@@ -13,7 +13,7 @@
 2. **Fonksiyonel Domain Ayrımı:**
    - Tüm yeni sayfalar, ilgili fonksiyonel domain klasörü altına yerleştirilmelidir (`docs/kast-app-wiki/`):
      - `architecture-decisions/`: Mimari Karar Kayıtları (ADR'ler).
-     - `core-models/`: Temel veri şemaları, modeller ve TypeSafe soru sözleşmeleri.
+     - `core-models/`: Temel veri şemaları, modeller ve veri sözleşmeleri.
      - `parsing-engine/`: Metin işleme, başlık filtreleme, zaman kodu tespiti ve anlamsal kararlar.
      - `pagination-subsystem/`: Sayfalama, PDF dönüştürücü ve mizanpaj motorları.
      - `document-generation/`: Word tablo yazma ve tipografi motoru.
@@ -33,7 +33,7 @@
 ## 2. Mimari Değişiklik ve ADR Zorunluluğu
 
 Kod tabanında kritik bir tasarım veya mimari değişiklik yapılmadan önce mutlaka bir ADR yazılmalıdır:
-- Yeni bir kütüphane eklendiğinde veya çıkarıldığında (Örn: `dxpdf` çıkarılıp `LibreOffice` eklenmesi veya TypeSafe AI entegrasyonu).
+- Yeni bir kütüphane eklendiğinde veya çıkarıldığında (Örn: `dxpdf` çıkarılıp `LibreOffice` eklenmesi).
 - Veri modellerinin sözleşmesi (schema) değiştiğinde.
 - Giriş/Çıkış veya sayfalama stratejisi revize edildiğinde.
 
@@ -73,18 +73,22 @@ Periyodik olarak ajanlar şu kontrolleri yapmalıdır:
 
 ---
 
-## 5. TypeSafe AI (System One) Kullanım ve Karar Protokolü
+## 5. Geliştirici Ajanın TypeSafe AI (System One) Karar ve Doğrulama Protokolü
 
-Kast kod tabanında anlamsal metin ayrıştırma, künye/karakter filtreleme ve sınıflandırma gerektiren durumlarda TypeSafe AI (`/typesafe-ai`) yetenekleri kullanılırken şu kurallara uyulmalıdır:
+`/typesafe-ai` skill'i, Kast masaüstü uygulamasının içine gömülü çalışan bir runtime kodu **değildir**. Kod tabanında görev alan **yapay zeka ajanının (AI Coding Agent / Antigravity)**; mimari kararlarında, alternatif seçimlerinde, risk değerlendirmelerinde, kod incelemelerinde ve wiki sağlığı denetimlerinde nesnel, tip güvenli ve kalibre edilmiş kararlar almasını sağlayan bir **mühendislik karar destek primitifidir**.
 
-1. **Skill Çağrısı ve Rol Ayrımı:**
-   - Ajanlar, karmaşık regex veya kırılgan string kontrollerinin yetersiz kaldığı anlamsal ayrıştırma durumlarında serbest metin üreten LLM çağrıları (`prompt-and-parse`) yerine `/typesafe-ai` skill'ini ve System One primitiflerini (`Choice`, `Score`, `Noul`) devreye sokmalıdır.
-2. **Merkezi Tanım İlkesi (Centralized Judgments):**
-   - Soru şablonları (`questions`), değerlendirme rubrikleri (`criteria`) ve olasılık/güven eşikleri (`thresholds`), kod bloklarının arasına dağıtılamaz.
-   - İnsan denetimini ve kod incelemesini kolaylaştırmak amacıyla tüm TypeSafe soru ve kriterleri tek bir merkezi modülde (örneğin `src/typesafe_judgments.py`) toplanmalıdır.
-3. **Atomik Değerlendirme & Kodda Birleştirme:**
-   - Çok boyutlu kararlar tek bir karmaşık soruya yüklenmemelidir. Sorular atomik parçalara bölünmeli, tek bir `state` üzerinden paralel sorgulanmalı ve nihai karar kural/ağırlık mantığı ile Python kodunda birleştirilmelidir.
-4. **Çevrimdışı ve Sıfır Bozulma (Offline Fallback):**
-   - Kast'ın temel çalışma felsefesi yerel ve hızlı olmaktır. API anahtarı (`TYPESAFE_API_KEY`) bulunmadığında veya ağ kesintisi/istek hatası durumunda sistem kesinlikle çökmeyecek; zarifçe mevcut kural tabanlı OpenXML motoruna (`metadata-filtering`, kural tabanlı parser) geri çekilecektir (fallback).
-5. **Ortam Değişkeni Güvenliği:**
-   - `TYPESAFE_API_KEY` kesinlikle dosyalara veya test fixture'larına hardcode edilemez; yalnızca ortam değişkeninden okunmalıdır.
+Ajanlar, karmaşık veya belirsiz durumlarda serbest metinli sübjektif varsayımlarda bulunmak yerine `/typesafe-ai` skill'ini ve System One primitiflerini (`Choice`, `Score`, `Noul`) şu senaryolarda doğrudan devreye sokmalıdır:
+
+1. **Mimari Alternatif ve Tasarım Seçimi (ADR & Planning):**
+   - Bir özellik veya refactor için 2 veya daha fazla teknik yaklaşım (örn. process isolation vs threading, kuyruk stratejileri, veri modelleri) değerlendirilirken, ajanın seçimini nesnel kriterlerle doğrulaması için `Choice` primitifi kullanılır.
+2. **Regresyon ve Kırılma Riski Puanlama (Risk Assessment):**
+   - Çekirdek modüllerde (sayfalama motoru, OpenXML ayrıştırma, arka plan worker'ları, kurulum ve derleme betikleri) değişiklik yapmadan önce değişikliğin sistem kararlılığına getirdiği risk seviyesi `Score` (düşük, orta, yüksek, kritik) ile ölçülür. Yüksek veya kritik risk durumlarında ajan ilave savunma testleri (regression test fixtures) inşa eder.
+3. **Living Architecture ve Kural Çelişki Denetimi (Contradiction Check):**
+   - Yapılan bir kod değişikliğinin veya yeni açılan bir wiki sayfasının var olan ADR'lerle, modellerle veya `AGENTS.md` kurallarıyla anlamsal bir çelişki üretip üretmediği `Noul` (Yes/No) ile doğrulanır.
+4. **Karmaşık Hata ve Uç Vaka Sınıflandırması (Root Cause Triage):**
+   - Testlerde veya işletim sistemi çağrılarında (Word COM kilidi, LibreOffice profil çakışması, GUI deadlock vb.) beklenmeyen bir hata oluştuğunda olası kök neden hipotezleri `Choice` ile elenir ve önceliklendirilir.
+5. **Skill Çağrısı ve Çalıştırma Yöntemi:**
+   - Ajan, `/home/umutaktepe/.gemini/config/skills/typesafe-ai/SKILL.md` yönergelerini takip ederek `typesafe-ai/scripts/typesafe_api.py` betiğini terminalden CLI veya Python üzerinden çağırır (`call_system_one`).
+   - Sorular atomik tanımlanmalı, bağlam (`state`) açıkça aktarılmalıdır.
+6. **Ortam ve Fallback Bağımsızlığı:**
+   - Ortamda `TYPESAFE_API_KEY` bulunmadığı veya ağ bağlantısı olmadığı durumlarda ajan bloklanmaz; doğrudan kendi deterministik mantığı ve testleriyle karar sürecini sürdürür.

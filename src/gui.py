@@ -181,14 +181,18 @@ class StudioTheme:
 
 
 class DropZoneWidget(QFrame):
-    """Pixel-perfect modern drag-drop zone matching the studio mockup."""
+    """Pixel-perfect modern drag-drop zone supporting single and multi-file workflows."""
 
     file_selected = Signal(str)
+    files_selected = Signal(list)
+    validation_error = Signal(str)
+
+    MAX_FILES: int = 25
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setAcceptDrops(True)
-        self._file_path: Optional[str] = None
+        self._file_paths: list[str] = []
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -221,11 +225,11 @@ class DropZoneWidget(QFrame):
         self.lbl_icon.setAlignment(Qt.AlignCenter)
         icon_layout.addWidget(self.lbl_icon)
 
-        self.lbl_prompt = QLabel("Senaryo dosyasını (.docx veya .pdf) buraya sürükleyip bırakın")
+        self.lbl_prompt = QLabel("Çeviri dosyasını (.docx veya .pdf) buraya sürükleyip bırakın")
         self.lbl_prompt.setStyleSheet("font-size: 14px; font-weight: 700; color: #f8fafc;")
         self.lbl_prompt.setAlignment(Qt.AlignCenter)
 
-        self.lbl_subprompt = QLabel("Microsoft Word veya metin formatlı senaryo PDF'leri desteklenmektedir.")
+        self.lbl_subprompt = QLabel("Microsoft Word veya metin formatlı çeviri PDF'leri desteklenmektedir.")
         self.lbl_subprompt.setStyleSheet("font-size: 11px; color: #64748b;")
         self.lbl_subprompt.setAlignment(Qt.AlignCenter)
 
@@ -302,10 +306,22 @@ class DropZoneWidget(QFrame):
 
         self._update_border_style(is_hover=False)
 
+    @property
+    def _file_path(self) -> Optional[str]:
+        return self._file_paths[0] if self._file_paths else None
+
+    @_file_path.setter
+    def _file_path(self, val: Optional[str]) -> None:
+        if val is None:
+            self._file_paths = []
+        else:
+            self._file_paths = [val]
+
     def _update_border_style(self, is_hover: bool = False) -> None:
-        border_color = "#38bdf8" if is_hover else ("#223554" if not self._file_path else "#10b981")
+        has_files = bool(self._file_paths)
+        border_color = "#38bdf8" if is_hover else ("#223554" if not has_files else "#10b981")
         bg_color = "#111d33" if is_hover else "#0c1424"
-        border_type = "dashed" if not self._file_path else "solid"
+        border_type = "dashed" if not has_files else "solid"
         self.setStyleSheet(f"""
             QFrame#drop-zone {{
                 background-color: {bg_color};
@@ -315,58 +331,143 @@ class DropZoneWidget(QFrame):
         """)
 
     def _open_file_dialog(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(
+        file_paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Dublaj Senaryo Dosyası Seçin",
+            "Dublaj Çeviri Dosyaları Seçin (En Fazla 25 Dosya)",
             "",
-            "Dublaj Senaryoları (*.docx *.pdf);;Word Belgeleri (*.docx);;PDF Belgeleri (*.pdf);;Tüm Dosyalar (*.*)",
+            "Dublaj Çevirileri (*.docx *.pdf);;Word Belgeleri (*.docx);;PDF Belgeleri (*.pdf);;Tüm Dosyalar (*.*)",
         )
-        if file_path:
-            self.set_file(file_path)
+        if file_paths:
+            self.set_files(file_paths)
 
-    def set_file(self, path: str) -> None:
-        clean_path = path.strip().strip("'\"")
-        ext = os.path.splitext(clean_path)[1].lower()
-        if ext not in (".docx", ".pdf"):
+    @classmethod
+    def validate_file_paths(cls, paths: list[str]) -> tuple[bool, str, list[str]]:
+        """Validate list of file paths according to studio rules.
+
+        Rules:
+        1. Non-empty list.
+        2. At most MAX_FILES (25) files.
+        3. Only .docx or .pdf files.
+        4. Uniform file type: all must be .docx OR all must be .pdf.
+        """
+        if not paths:
+            return False, "Hiçbir dosya seçilmedi.", []
+
+        clean_paths = [p.strip().strip("'\"") for p in paths if p and p.strip().strip("'\"")]
+        clean_paths = list(dict.fromkeys(clean_paths))
+        if not clean_paths:
+            return False, "Hiçbir geçerli dosya yolu belirtilmedi.", []
+
+        if len(clean_paths) > cls.MAX_FILES:
+            return (
+                False,
+                f"En fazla {cls.MAX_FILES} dosya seçebilirsiniz. ({len(clean_paths)} dosya seçildi. Lütfen seçimi azaltın.)",
+                [],
+            )
+
+        extensions = set()
+        for p in clean_paths:
+            ext = os.path.splitext(p)[1].lower()
+            if ext not in (".docx", ".pdf"):
+                return (
+                    False,
+                    f"Desteklenmeyen dosya formatı tespit edildi: '{os.path.basename(p)}'. Yalnızca .docx ve .pdf dosyaları desteklenmektedir.",
+                    [],
+                )
+            extensions.add(ext)
+
+        if len(extensions) > 1:
+            return (
+                False,
+                "Çoklu dosya işlemlerinde yalnızca aynı türden dosyalar seçilebilir. Lütfen yalnızca .docx dosyalarını veya yalnızca .pdf dosyalarını seçin.",
+                [],
+            )
+
+        return True, "", clean_paths
+
+    def _update_loaded_ui_for_files(self, paths: list[str]) -> None:
+        if not paths:
             return
+        count = len(paths)
+        ext = os.path.splitext(paths[0])[1].lower()
+        is_pdf = (ext == ".pdf")
 
-        self._file_path = clean_path
-        filename = os.path.basename(clean_path)
-        size_bytes = os.path.getsize(clean_path) if os.path.exists(clean_path) else 0
-        size_str = f"{size_bytes / 1024:.1f} KB" if size_bytes < 1024 * 1024 else f"{size_bytes / (1024 * 1024):.1f} MB"
+        total_bytes = 0
+        for p in paths:
+            try:
+                if os.path.exists(p):
+                    total_bytes += os.path.getsize(p)
+            except OSError:
+                pass
 
-        self.lbl_filename.setText(filename)
-        self.lbl_filesize.setText(f"{size_str} • {clean_path}")
+        size_str = (
+            f"{total_bytes / 1024:.1f} KB"
+            if total_bytes < 1024 * 1024
+            else f"{total_bytes / (1024 * 1024):.1f} MB"
+        )
 
-        if ext == ".pdf":
-            self.lbl_badge.setText("PDF")
-            self.lbl_badge.setStyleSheet(
-                "background-color: #f43f5e; color: #ffffff; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 4px;"
-            )
+        badge_type = "PDF" if is_pdf else "DOCX"
+        badge_color = "#f43f5e" if is_pdf else "#0284c7"
+
+        if count == 1:
+            filename = os.path.basename(paths[0])
+            self.lbl_badge.setText(badge_type)
+            self.lbl_filename.setText(filename)
+            self.lbl_filename.setToolTip(paths[0])
+            self.lbl_filesize.setText(f"{size_str} • {paths[0]}")
         else:
-            self.lbl_badge.setText("DOCX")
-            self.lbl_badge.setStyleSheet(
-                "background-color: #0284c7; color: #ffffff; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 4px;"
-            )
+            self.lbl_badge.setText(f"{badge_type} ({count} Dosya)")
+            self.lbl_filename.setText(f"{count} adet çeviri dosyası hazır")
+            tooltip_text = "\n".join(f"• {os.path.basename(p)}" for p in paths)
+            self.lbl_filename.setToolTip(tooltip_text)
+            self.lbl_filesize.setText(f"Toplam Boyut: {size_str} • En Fazla {self.MAX_FILES} Dosya")
+
+        self.lbl_badge.setStyleSheet(
+            f"background-color: {badge_color}; color: #ffffff; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 4px;"
+        )
 
         self.empty_container.setVisible(False)
         self.loaded_container.setVisible(True)
         self._update_border_style()
-        self.file_selected.emit(self._file_path)
+
+    def set_files(self, paths: list[str]) -> bool:
+        """Validate and set multiple files."""
+        is_valid, err_msg, clean_paths = self.validate_file_paths(paths)
+        if not is_valid:
+            self.validation_error.emit(err_msg)
+            return False
+
+        self._file_paths = clean_paths
+        self._update_loaded_ui_for_files(self._file_paths)
+        self.file_selected.emit(self._file_paths[0])
+        self.files_selected.emit(self._file_paths)
+        return True
+
+    def set_file(self, path: str) -> None:
+        """Backward-compatible setter for single file."""
+        if not path:
+            return
+        self.set_files([path])
+
+    def get_files(self) -> list[str]:
+        """Return list of currently selected file paths."""
+        return list(self._file_paths)
+
+    def get_file_path(self) -> Optional[str]:
+        """Backward-compatible getter returning first file or None."""
+        return self._file_paths[0] if self._file_paths else None
 
     def clear(self) -> None:
-        self._file_path = None
+        self._file_paths = []
         self.empty_container.setVisible(True)
         self.loaded_container.setVisible(False)
         self._update_border_style()
 
-    def get_file_path(self) -> Optional[str]:
-        return self._file_path
-
     def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasUrls():
             urls = event.mimeData().urls()
-            if any(u.toLocalFile().lower().endswith((".docx", ".pdf")) for u in urls):
+            local_paths = [u.toLocalFile() for u in urls if u.toLocalFile()]
+            if any(p.lower().endswith((".docx", ".pdf")) for p in local_paths):
                 event.acceptProposedAction()
                 self._update_border_style(is_hover=True)
 
@@ -375,12 +476,11 @@ class DropZoneWidget(QFrame):
 
     def dropEvent(self, event) -> None:
         self._update_border_style(is_hover=False)
-        for url in event.mimeData().urls():
-            local_path = url.toLocalFile()
-            if local_path.lower().endswith((".docx", ".pdf")):
-                self.set_file(local_path)
+        local_paths = [u.toLocalFile() for u in event.mimeData().urls() if u.toLocalFile()]
+        if local_paths:
+            success = self.set_files(local_paths)
+            if success:
                 event.acceptProposedAction()
-                break
 
 
 class OptionTileWidget(QFrame):
@@ -516,11 +616,139 @@ class OptionTileGroup:
             t.set_selected(t is target_tile)
 
 
-class ExtractionWorker(QThread):
-    """Background worker thread to execute cast extraction without blocking GUI."""
+class BatchExtractionWorker(QThread):
+    """Background worker thread to sequentially and safely process up to 25 files without resource contention."""
 
     progress = Signal(int, str)
     log = Signal(str)
+    file_started = Signal(int, int, str)
+    file_completed = Signal(int, int, str, object)
+    file_error = Signal(int, int, str, str)
+    all_finished = Signal(list)
+
+    def __init__(
+        self,
+        file_paths: list[str],
+        sort_by: str,
+        in_place: bool,
+        standalone: bool,
+        output_dir: Optional[str] = None,
+        is_single_compat: bool = False,
+    ):
+        super().__init__()
+        self.file_paths = file_paths
+        self.sort_by = sort_by
+        self.in_place = in_place
+        self.standalone = standalone
+        self.output_dir = output_dir
+        self.is_single_compat = is_single_compat
+
+    def run(self) -> None:
+        total_files = len(self.file_paths)
+        if total_files == 0:
+            self.progress.emit(100, "İşlenecek dosya yok.")
+            self.all_finished.emit([])
+            return
+
+        summary: list[dict] = []
+        file_weight = 100.0 / total_files
+
+        if self.is_single_compat:
+            self.log.emit(f"[*] İşlem başlatılıyor: {os.path.basename(self.file_paths[0])}")
+        else:
+            self.log.emit(f"[*] Toplu işlem başlatıldı: Toplam {total_files} çeviri dosyası işlenecek.")
+
+        for idx, file_path in enumerate(self.file_paths, start=1):
+            filename = os.path.basename(file_path)
+            self.file_started.emit(idx, total_files, filename)
+            if not self.is_single_compat:
+                self.log.emit(f"[{idx}/{total_files}] Başlatılıyor: {filename}")
+
+            base_pct = int((idx - 1) * file_weight)
+
+            def sub_progress(sub_pct: int, msg: str):
+                if self.is_single_compat:
+                    self.progress.emit(sub_pct, msg)
+                    self.log.emit(f"[{sub_pct}%] {msg}")
+                else:
+                    overall_pct = int(base_pct + (sub_pct / 100.0) * file_weight)
+                    overall_pct = max(0, min(99, overall_pct))
+                    status_str = f"[{idx}/{total_files}] {filename} ({sub_pct}%): {msg}"
+                    self.progress.emit(overall_pct, status_str)
+
+            try:
+                out_path = None
+                if self.output_dir and not self.in_place:
+                    base = os.path.splitext(filename)[0]
+                    out_path = os.path.join(self.output_dir, f"{base}_kast.docx")
+
+                saved_path, result = process_dubbing_file(
+                    file_path=file_path,
+                    output_path=out_path,
+                    sort_by=self.sort_by,
+                    in_place=self.in_place,
+                    standalone=self.standalone,
+                    progress_callback=sub_progress,
+                )
+
+                char_count = len(getattr(result, "characters", []))
+                line_count = getattr(result, "total_lines", 0)
+                self.log.emit(
+                    f"<span style='color:#10b981;'>[✓] [{idx}/{total_files}] Tamamlandı: {os.path.basename(saved_path)} "
+                    f"({char_count} Karakter • {line_count} Replik)</span>"
+                )
+                self.file_completed.emit(idx, total_files, saved_path, result)
+                summary.append({
+                    "path": file_path,
+                    "output": saved_path,
+                    "result": result,
+                    "status": "success",
+                    "error": None,
+                })
+            except PermissionError:
+                if self.is_single_compat:
+                    err_msg = (
+                        "Dosyaya erişim engellendi. Dosya şu anda Microsoft Word, PDF okuyucu veya başka bir programda açık olabilir. "
+                        "Lütfen dosyayı kapatıp tekrar deneyin."
+                    )
+                else:
+                    err_msg = (
+                        f"Dosyaya erişim engellendi ({filename}). Dosya Microsoft Word, PDF okuyucu veya "
+                        "başka bir programda açık olabilir. Lütfen kapatıp tekrar deneyin."
+                    )
+                self.log.emit(f"<span style='color:#f43f5e;'>[!] [{idx}/{total_files}] HATA: {err_msg}</span>")
+                self.file_error.emit(idx, total_files, filename, err_msg)
+                summary.append({
+                    "path": file_path,
+                    "output": None,
+                    "result": None,
+                    "status": "error",
+                    "error": err_msg,
+                })
+            except Exception as e:
+                err_msg = str(e)
+                self.log.emit(f"<span style='color:#f43f5e;'>[!] [{idx}/{total_files}] HATA ({filename}): {err_msg}</span>")
+                self.file_error.emit(idx, total_files, filename, err_msg)
+                summary.append({
+                    "path": file_path,
+                    "output": None,
+                    "result": None,
+                    "status": "error",
+                    "error": err_msg,
+                })
+
+        success_count = sum(1 for s in summary if s["status"] == "success")
+        if self.is_single_compat:
+            self.progress.emit(100, "İşlem tamamlandı")
+        else:
+            self.progress.emit(100, f"Toplu işlem tamamlandı ({success_count}/{total_files} başarılı)")
+            self.log.emit(f"[*] İşlem bitti: {success_count}/{total_files} dosya başarıyla oluşturuldu.")
+        self.all_finished.emit(summary)
+
+
+class ExtractionWorker(BatchExtractionWorker):
+    """Backward-compatible single-file worker wrapper."""
+
     finished = Signal(str, object)
     error = Signal(str)
 
@@ -532,41 +760,25 @@ class ExtractionWorker(QThread):
         standalone: bool,
         output_dir: Optional[str] = None,
     ):
-        super().__init__()
+        super().__init__(
+            file_paths=[file_path],
+            sort_by=sort_by,
+            in_place=in_place,
+            standalone=standalone,
+            output_dir=output_dir,
+            is_single_compat=True,
+        )
         self.file_path = file_path
-        self.sort_by = sort_by
-        self.in_place = in_place
-        self.standalone = standalone
-        self.output_dir = output_dir
+        self.all_finished.connect(self._handle_compat_finished)
 
-    def run(self) -> None:
-        try:
-            self.log.emit(f"[*] İşlem başlatılıyor: {os.path.basename(self.file_path)}")
-            out_path = None
-            if self.output_dir and not self.in_place:
-                base = os.path.splitext(os.path.basename(self.file_path))[0]
-                out_path = os.path.join(self.output_dir, f"{base}_kast.docx")
-
-            def progress_cb(pct: int, msg: str):
-                self.progress.emit(pct, msg)
-                self.log.emit(f"[{pct}%] {msg}")
-
-            saved_path, result = process_dubbing_file(
-                file_path=self.file_path,
-                output_path=out_path,
-                sort_by=self.sort_by,
-                in_place=self.in_place,
-                standalone=self.standalone,
-                progress_callback=progress_cb,
-            )
-            self.finished.emit(saved_path, result)
-        except PermissionError:
-            self.error.emit(
-                "Dosyaya erişim engellendi. Dosya şu anda Microsoft Word, PDF okuyucu veya başka bir programda açık olabilir. "
-                "Lütfen dosyayı kapatıp tekrar deneyin."
-            )
-        except Exception as e:
-            self.error.emit(str(e))
+    def _handle_compat_finished(self, summary: list[dict]) -> None:
+        if not summary:
+            return
+        item = summary[0]
+        if item["status"] == "success":
+            self.finished.emit(item["output"], item["result"])
+        else:
+            self.error.emit(item["error"] or "Bilinmeyen hata")
 
 
 class KastStudioWindow(QMainWindow):
@@ -580,7 +792,8 @@ class KastStudioWindow(QMainWindow):
         self.setStyleSheet(StudioTheme.get_stylesheet())
 
         self.last_output_file: Optional[str] = None
-        self.worker: Optional[ExtractionWorker] = None
+        self.batch_worker: Optional[BatchExtractionWorker] = None
+        self.worker: Optional[BatchExtractionWorker] = None
 
         # Pencere ve görev çubuğu ikonu
         icon_paths = [
@@ -625,7 +838,7 @@ class KastStudioWindow(QMainWindow):
         title_hbox.addWidget(self.lbl_title_suffix)
         title_hbox.addStretch()
 
-        self.lbl_subtitle = QLabel("Senaryo belgelerindeki diyalogları ve karakter listesini otomatik analiz eder.")
+        self.lbl_subtitle = QLabel("Çeviri belgelerindeki diyalogları ve karakter listesini otomatik analiz eder.")
         self.lbl_subtitle.setStyleSheet("font-size: 13px; color: #64748b;")
 
         title_vbox.addLayout(title_hbox)
@@ -649,6 +862,9 @@ class KastStudioWindow(QMainWindow):
 
         # 2. Central Drop Zone
         self.drop_zone = DropZoneWidget()
+        self.drop_zone.files_selected.connect(self._on_files_selected)
+        self.drop_zone.validation_error.connect(self._on_validation_error)
+        # Geriye dönük uyumluluk için file_selected bağlantısı:
         self.drop_zone.file_selected.connect(self._on_file_selected)
         main_layout.addWidget(self.drop_zone)
 
@@ -825,19 +1041,53 @@ class KastStudioWindow(QMainWindow):
         status_bar.addWidget(self.lbl_status_left)
         status_bar.addPermanentWidget(self.lbl_status_right)
 
-    def _on_file_selected(self, file_path: str) -> None:
+    def _on_files_selected(self, file_paths: list[str]) -> None:
+        if not file_paths:
+            return
         self.btn_extract.setEnabled(True)
+        self.lbl_status.setText("● Durum: Hazır")
         self.result_card.setVisible(False)
-        ext = os.path.splitext(file_path)[1].lower()
+
+        count = len(file_paths)
+        ext = os.path.splitext(file_paths[0])[1].lower()
+
         if ext == ".pdf":
             self.tile_inplace.setEnabled(False)
             self.tile_inplace.setToolTip("PDF dosyalarının üzerine doğrudan Word tablosu yazılamaz.")
             self.tile_standalone.setChecked(True)
-            self.log_area.append(f"<span style='color:#38bdf8;'>[BİLGİ] PDF algılandı: {os.path.basename(file_path)} (Doğrudan ayrıştırma devrede)</span>")
+            if count == 1:
+                self.log_area.append(
+                    f"<span style='color:#38bdf8;'>[BİLGİ] PDF algılandı: {os.path.basename(file_paths[0])} (Doğrudan ayrıştırma devrede)</span>"
+                )
+            else:
+                self.log_area.append(
+                    f"<span style='color:#38bdf8;'>[BİLGİ] {count} adet PDF çevirisi algılandı. (Doğrudan ayrıştırma devrede)</span>"
+                )
         else:
             self.tile_inplace.setEnabled(True)
             self.tile_inplace.setToolTip("")
-            self.log_area.append(f"<span style='color:#38bdf8;'>[BİLGİ] DOCX algılandı: {os.path.basename(file_path)} (Word/LibreOffice sayfalama devrede)</span>")
+            if count == 1:
+                self.log_area.append(
+                    f"<span style='color:#38bdf8;'>[BİLGİ] DOCX algılandı: {os.path.basename(file_paths[0])} (Word/LibreOffice sayfalama devrede)</span>"
+                )
+            else:
+                self.log_area.append(
+                    f"<span style='color:#38bdf8;'>[BİLGİ] {count} adet DOCX çevirisi algılandı. (Word/LibreOffice sayfalama devrede)</span>"
+                )
+
+    def _on_file_selected(self, file_path: str) -> None:
+        """Geriye dönük uyumluluk için tek dosya seçimi yöneticisi."""
+        if not file_path:
+            return
+        # drop_zone sinyalleri ile çifte log yazılmasını engelle
+        if self.drop_zone.get_files():
+            return
+        self._on_files_selected([file_path])
+
+    def _on_validation_error(self, err_msg: str) -> None:
+        self.btn_extract.setEnabled(False)
+        self.lbl_status.setText("● Durum: Doğrulama Hatası")
+        self.log_area.append(f"<span style='color:#f43f5e; font-weight:bold;'>[!] Doğrulama Hatası: {err_msg}</span>")
 
     def _clear_all(self) -> None:
         self.drop_zone.clear()
@@ -850,11 +1100,15 @@ class KastStudioWindow(QMainWindow):
         self.tile_inplace.setToolTip("")
         self.tile_appearance.setChecked(True)
         self.tile_standalone.setChecked(True)
+        self.btn_open_file.setEnabled(True)
+        self.btn_open_folder.setEnabled(True)
+        self.btn_open_file.setText("📄 Dosyayı Aç")
         self.log_area.clear()
 
     def _start_extraction(self) -> None:
-        file_path = self.drop_zone.get_file_path()
-        if not file_path:
+        self.last_output_file = None
+        file_paths = self.drop_zone.get_files()
+        if not file_paths:
             return
 
         sort_by = "appearance"
@@ -869,21 +1123,78 @@ class KastStudioWindow(QMainWindow):
         self.btn_extract.setEnabled(False)
         self.btn_clear.setEnabled(False)
         self.result_card.setVisible(False)
-        self.progress_bar.setValue(5)
-        self.lbl_pct.setText("%5")
-        self.lbl_status.setText("● Durum: İşlem başlatılıyor...")
+        self.progress_bar.setValue(2)
+        self.lbl_pct.setText("%2")
+        self.lbl_status.setText("● Durum: Toplu işlem başlatılıyor...")
 
-        self.worker = ExtractionWorker(
-            file_path=file_path,
+        self.batch_worker = BatchExtractionWorker(
+            file_paths=file_paths,
             sort_by=sort_by,
             in_place=in_place,
             standalone=standalone,
         )
-        self.worker.progress.connect(self._on_worker_progress)
-        self.worker.log.connect(self._on_worker_log)
-        self.worker.finished.connect(self._on_worker_finished)
-        self.worker.error.connect(self._on_worker_error)
-        self.worker.start()
+        # Geriye dönük uyumluluk referansı
+        self.worker = self.batch_worker
+
+        self.batch_worker.progress.connect(self._on_worker_progress)
+        self.batch_worker.log.connect(self._on_worker_log)
+        self.batch_worker.all_finished.connect(self._on_batch_finished)
+        self.batch_worker.start()
+
+    def _on_batch_finished(self, summary: list[dict]) -> None:
+        total = len(summary)
+        successes = [s for s in summary if s["status"] == "success"]
+        errors = [s for s in summary if s["status"] == "error"]
+
+        if successes:
+            self.last_output_file = successes[-1]["output"]
+
+        self.progress_bar.setValue(100)
+        self.lbl_pct.setText("%100")
+        self.btn_extract.setEnabled(True)
+        self.btn_clear.setEnabled(True)
+        self.result_card.setVisible(True)
+
+        total_chars = sum(len(getattr(s["result"], "characters", [])) for s in successes if s.get("result"))
+        total_lines = 0
+        for s in successes:
+            res = s.get("result")
+            if not res:
+                continue
+            chars = getattr(res, "characters", [])
+            chars_lines = sum(getattr(c, "line_count", 0) for c in chars)
+            res_lines = getattr(res, "total_lines", 0)
+            total_lines += chars_lines if chars_lines > 0 else (res_lines if isinstance(res_lines, int) else 0)
+
+        if len(errors) == 0:
+            self.lbl_status.setText("● Durum: Tamamlandı")
+            self.lbl_result_text.setStyleSheet("color: #10b981; font-weight: bold; font-size: 13px;")
+            self.lbl_result_text.setText(
+                f"✓ {len(successes)}/{total} dosya başarıyla oluşturuldu! (Toplam: {total_chars} Karakter • {total_lines} Replik)"
+            )
+            self.btn_open_file.setEnabled(True)
+            self.btn_open_folder.setEnabled(True)
+        elif len(successes) == 0:
+            self.lbl_status.setText(f"● Durum: İşlem Başarısız ({len(errors)} hata)")
+            self.lbl_result_text.setStyleSheet("color: #f43f5e; font-weight: bold; font-size: 13px;")
+            self.lbl_result_text.setText(
+                f"❌ İşlem Başarısız: {len(errors)}/{total} dosyada hata oluştu."
+            )
+            self.btn_open_file.setEnabled(False)
+            self.btn_open_folder.setEnabled(False)
+        else:
+            self.lbl_status.setText(f"● Durum: Tamamlandı ({len(errors)} hata)")
+            self.lbl_result_text.setStyleSheet("color: #f59e0b; font-weight: bold; font-size: 13px;")
+            self.lbl_result_text.setText(
+                f"⚠️ Kısmi Tamamlandı: {len(successes)}/{total} başarılı, {len(errors)} dosyada hata oluştu."
+            )
+            self.btn_open_file.setEnabled(True)
+            self.btn_open_folder.setEnabled(True)
+
+        if total > 1:
+            self.btn_open_file.setText("📄 Son Dosyayı Aç")
+        else:
+            self.btn_open_file.setText("📄 Dosyayı Aç")
 
     def _on_worker_progress(self, pct: int, msg: str) -> None:
         self.progress_bar.setValue(pct)

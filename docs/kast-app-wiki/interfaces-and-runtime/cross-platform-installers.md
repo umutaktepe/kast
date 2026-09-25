@@ -22,12 +22,11 @@ Kast 2.0, kullanıcıların karmaşık Python veya sanal ortam konfigürasyonlar
 | :--- | :--- | :--- |
 | `Kast-vX.Y.Z-Setup.exe` | Windows (x64) | **Resmi Bağımsız Kurulum Sihirbazı:** Python gerektirmez; Inno Setup 6 ile masaüstü/başlat kısayolları kurar, sistemde Word/LibreOffice denetimi yapar ve yoksa LibreOffice'i sessizce yükler ([[inno-setup-installer]]). |
 | `Kast-vX.Y.Z-Windows-Portable.zip` | Windows (x64) | **Taşınabilir Bağımsız Sürüm:** Kurulum ve yönetici yetkisi gerektirmeyen, USB bellek veya yerel klasörden doğrudan çalışan PyInstaller klasör demeti ([[pyinstaller-standalone-packaging]]). |
-| `install.sh` | Linux / macOS (Bash) | Sanal ortam (`.venv`) kurar, LibreOffice paketini (apt/dnf/pacman/zypper) kontrol edip kurar, bağımlılıkları yükler ve `~/.local/bin/kast` sembolik bağını oluşturur. |
-| `install.ps1` | Windows (PowerShell) | Geliştirici ve CLI kullanıcıları için Python sanal ortamını kurar, LibreOffice kontrolü yapar (winget/choco desteği), bağımlılıkları yükler, `%USERPROFILE%\bin\kast.cmd` başlatıcısını oluşturur ve Kullanıcı `PATH` ortam değişkenine ekler. |
+| `install.sh` | Linux / macOS (Bash) | Sanal ortam (`.venv`) kurar, LibreOffice paketini kontrol edip kurar, bağımlılıkları (TUI, GUI ve motor) yükler ve `~/.local/bin/kast` sembolik bağını oluşturur (`kast`, `kast --gui`, `kast dosya.docx`). |
+| `install.ps1` | Windows (PowerShell) | Geliştirici ve CLI kullanıcıları için sanal ortamı kurar, LibreOffice denetimi yapar, bağımlılıkları (TUI, GUI ve motor) yükler, `%USERPROFILE%\bin\kast.cmd` başlatıcısını oluşturur ve Kullanıcı `PATH` ortam değişkenine ekler (`kast`, `kast --gui`, `kast dosya.docx`). |
 | `install.bat` | Windows (CMD) | Çift tıklamayla veya CMD'den `install.ps1` dosyasını `ExecutionPolicy Bypass` ile çalıştıran sarmalayıcı (wrapper). |
-| `bin/kast` | Linux / macOS | Sanal ortamdaki Python'u ve ana betiği (`kast.py`) tetikleyen yürütülebilir kabuk başlatıcısı. |
-| `kast.cmd` | Windows | Windows komut satırından sanal ortam Python'unu çağıran batch başlatıcısı. |
-| `kast-gui.cmd` | Windows | Modern Qt6 Stüdyo GUI (`kast.py --gui`) arayüzünü doğrudan çağıran Windows batch başlatıcısı. |
+| `bin/kast` | Linux / macOS | Sanal ortamdaki Python'u ve ana betiği (`kast.py`) tetikleyen, tüm terminal parametrelerini (`$@`) ileten yürütülebilir kabuk başlatıcısı. |
+| `kast.cmd` | Windows | Windows komut satırından sanal ortam Python'unu ve tüm parametreleri (`%*`) `kast.py` betiğine ileten tekil batch başlatıcısı. |
 | `uninstall.sh` / `uninstall.ps1` | Tüm Platformlar | Sembolik bağları ve başlatıcıları sistemden temizleyen kaldırma betikleri. |
 
 ## Bağımsız Windows Paketleri (Zero-Python Dağıtım)

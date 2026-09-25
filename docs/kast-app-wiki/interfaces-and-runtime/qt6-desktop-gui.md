@@ -11,13 +11,14 @@ tags:
   - drop-zone
   - theme
   - qthread
+  - batch-processing
 ---
 
 # Modül: Qt6 Desktop GUI ve DropZone Bileşeni
 
-Bu sayfa, Kast 2.0 masaüstü grafiksel kullanıcı arayüzünün (`src/gui.py`), stüdyo sınıfı koyu temasının (`StudioTheme`), sürükle-bırak dosya girdi bileşeninin (`DropZoneWidget`), asenkron arka plan iş parçacığının (`ExtractionWorker`) ve ana pencere (`KastStudioWindow`) mimarisini belgeler.
+Bu sayfa, Kast 2.0 masaüstü grafiksel kullanıcı arayüzünün (`src/gui.py`), stüdyo sınıfı koyu temasının (`StudioTheme`), sürükle-bırak ve yerel dosya seçici destekli girdi bileşeninin (`DropZoneWidget`), sıralı ve kaynak güvenli arka plan iş parçacığının (`BatchExtractionWorker` / `ExtractionWorker`) ve ana pencere (`KastStudioWindow`) mimarisini belgeler.
 
-Tasarım kararları ve gerekçeleri [[adr-005-qt6-windows-studio-gui]] belgesinde detaylandırılmıştır.
+Tasarım kararları ve gerekçeleri [[adr-005-qt6-windows-studio-gui]] ve [[adr-007-batch-file-processing-pipeline]] belgelerinde detaylandırılmıştır.
 
 ---
 
@@ -28,9 +29,10 @@ Kast 2.0 masaüstü arayüzü, PySide6 (Qt6) kütüphanesi üzerine kurulu olup 
 | Bileşen | Taban Sınıf | Temel Sorumluluk |
 | :--- | :--- | :--- |
 | `StudioTheme` | Nesne / Sabitler | Tokyo Night stüdyo renk paleti, tipografi kuralları ve QSS stil şablonunu sağlar. |
-| `DropZoneWidget` | `QFrame` | `.docx` ve `.pdf` dosyalarını sürükle-bırak ve yerel dosya seçiciyle kabul eden çift durumlu görsel kart. |
-| `ExtractionWorker` | `QThread` | Ağır ayrıştırma ve sayfalama işlemlerini arayüzü dondurmadan yürüten arka plan iş parçacığı. |
-| `KastStudioWindow` | `QMainWindow` | Bırakma alanı, sıralama/çıktı kontrolleri, ilerleme çubuğu, sonuç kartı ve işlem günlüğünü barındıran ana pencere. |
+| `DropZoneWidget` | `QFrame` | 25 dosyaya kadar `.docx` ve `.pdf` dosyalarını sürükle-bırak ve yerel dosya seçiciyle kabul eden, homojenlik doğrulayan çift durumlu görsel kart. |
+| `BatchExtractionWorker` | `QThread` | Birden çok çeviri dosyasını sıralı (concurrency = 1) işleyen, dosya bazında hata toleransı sağlayan ve arayüzü dondurmayan arka plan iş parçacığı. |
+| `ExtractionWorker` | `BatchExtractionWorker` | Geriye dönük uyumluluk sağlayan tekil dosya iş parçacığı sarmalayıcısı. |
+| `KastStudioWindow` | `QMainWindow` | Bırakma alanı, sıralama/çıktı kontrolleri, ilerleme çubuğu, dinamik sonuç kartı ve işlem günlüğünü barındıran ana pencere. |
 | `launch_gui()` | Fonksiyon | Fusion stili ve stüdyo temasıyla Qt uygulamasını (`QApplication`) başlatan modül giriş noktası. |
 
 ---
@@ -63,64 +65,120 @@ Arayüz, seslendirme ve dublaj stüdyolarında uzun saatler çalışan kullanıc
 
 ---
 
-## 3. DropZoneWidget ve Sürükle-Bırak Motoru
+## 3. DropZoneWidget ve Çoklu Dosya Doğrulama Motoru
 
-`DropZoneWidget`, kullanıcının senaryo dosyasını en az eforla sisteme aktarmasını sağlayan interaktif bir bileşendir:
+`DropZoneWidget`, kullanıcının tekil veya çoklu (25 adede kadar) senaryo dosyalarını en az eforla sisteme aktarmasını sağlayan interaktif ve korumalı bir bileşendir:
 
-### Sürükle-Bırak Mekanizması
-- `setAcceptDrops(True)` ile olayları dinler.
-- `dragEnterEvent`: Bırakılmak istenen nesnenin yerel bir dosya URL'si olup olmadığını (`event.mimeData().hasUrls()`) ve uzantısının `.docx` veya `.pdf` olduğunu doğrular. Geçerliyse kenarlık rengini `border_focus` (`#7aa2f7`) yapar ve `event.acceptProposedAction()` çağırır.
+### Sürükle-Bırak Mekanizması ve Dosya Seçici
+- `setAcceptDrops(True)` ile sürükleme olaylarını dinler.
+- `dragEnterEvent`: Bırakılmak istenen nesnelerin yerel dosya URL'si olup olmadığını (`event.mimeData().hasUrls()`) denetler. En az bir geçerli `.docx` veya `.pdf` varsa kenarlık rengini `border_focus` (`#38bdf8`) yapar ve `event.acceptProposedAction()` çağırır.
 - `dragLeaveEvent`: Fare bırakma alanından çıktığında kenarlık rengini varsayılan `border` durumuna döndürür.
-- `dropEvent`: Bırakılan ilk geçerli dosya yolunu alır, `set_file(path)` metodunu tetikler.
+- `dropEvent`: Bırakılan tüm URL yollarını ayıklar ve `set_files(paths)` doğrulama motoruna iletir.
+- **Yerel Çoklu Dosya Seçici:** "☁  Dosya Seç" butonu `QFileDialog.getOpenFileNames(...)` çağırarak kullanıcının yerel dosya yöneticisinden `Ctrl+A` veya `Shift+Tık` ile çoklu seçim yapabilmesini sağlar.
+
+### Çoklu Dosya Doğrulama Kuralları (`validate_file_paths`)
+Bileşen, sisteme dosya kabul etmeden önce sınıf seviyesindeki `validate_file_paths(paths)` fonksiyonunu çalıştırır:
+1. **Yol Temizliği ve Tekilleştirme:** Liste elemanlarındaki boşluklar ve tırnaklar (`p.strip().strip("'\"")`) temizlenir; boş öğeler elenir; sıralı sıra korunarak `dict.fromkeys` ile yinelenen yollar elenir.
+2. **Boş Liste Kontrolü:** Geçerli dosya yolu kalmamışsa işlem reddedilir (`Dosya listesi boş.`).
+3. **25 Dosya Tavan Sınırı (`MAX_FILES = 25`):** Seçilen dosya sayısı 25'i aşıyorsa işlem reddedilir (`En fazla 25 dosya seçebilirsiniz. (N dosya seçildi)`).
+4. **Desteklenen Uzantı Kontrolü:** Yalnızca `.docx` ve `.pdf` uzantılı dosyalar kabul edilir; farklı uzantılar (`.txt`, `.xlsx` vb.) reddedilir.
+5. **Homojen Dosya Türü Kuralı (Uniform Extension):** Liste hem `.docx` hem `.pdf` dosyalarını aynı anda içeremez (`Lütfen yalnızca .docx veya yalnızca .pdf dosyaları seçin. Karma dosya türleri desteklenmemektedir.`).
 
 ### Çift Durumlu Görsel Arayüz (Dual-State Layout)
 - **Boş Durum (`empty_container`):**
   - Kesikli lacivert kenarlık (`dashed 1.5px #223554`, arka plan `#0c1424`, fare üzerine gelince `#38bdf8` / `#111d33`).
   - Dairesel mavi bulut ikonu rozeti (`☁↑`, `border: 1.5px solid #0284c7`, zemin `#111d33`, çap 52px).
-  - Başlık metni ("Senaryo dosyasını (.docx veya .pdf) buraya sürükleyip bırakın").
-  - Alt metin ("Microsoft Word veya metin formatlı senaryo PDF'leri desteklenmektedir.").
+  - Başlık metni ("Çeviri dosyasını (.docx veya .pdf) buraya sürükleyip bırakın").
+  - Alt metin ("Microsoft Word veya metin formatlı çeviri PDF'leri desteklenmektedir.").
   - Format hapları (`.DOCX` ve `.PDF` etiketleri).
-  - "☁  Dosya Seç" butonu (`QFileDialog.getOpenFileName`).
+  - "☁  Dosya Seç" butonu (`QFileDialog.getOpenFileNames`).
 - **Yüklü Durum (`loaded_container`):**
   - Dolu yeşil kenarlık (`solid 1.5px #10b981`).
-  - **Format Rozeti:** Dosya türüne göre dinamik renklendirilen `QLabel` rozeti (DOCX için `#0284c7`, PDF için `#f43f5e`).
-  - **Dosya Bilgisi:** Dosya adı ve insan tarafından okunabilir dosya boyutu (ör. `1.4 MB`).
+  - **Dinamik Format Rozeti:**
+    - Tekil dosya seçildiğinde: `DOCX` (`#0284c7`) veya `PDF` (`#f43f5e`).
+    - Çoklu dosya seçildiğinde: `DOCX (N Dosya)` veya `PDF (N Dosya)` rozeti.
+  - **Dosya Bilgisi:**
+    - Tekil dosyada: Tam dosya adı (ör. `bolum_01.docx`).
+    - Çoklu dosyada: `N adet çeviri dosyası hazır` başlığı ve dosya listesi tooltip'i.
+    - **Tooltip:** Fare bileşen üzerine geldiğinde seçilen tüm dosyaların tam yollarını listeleyen açıklama penceresi (`\n` ile birleştirilmiş).
+  - **Kümülatif Boyut Bilgisi:** Seçili tüm geçerli dosyaların disk boyutlarının toplamı insan tarafından okunabilir biçimde gösterilir (ör. `14.2 MB`).
   - **"✕ Değiştir" Butonu:** Mevcut seçimi sıfırlayarak boş duruma geri döndürür (`clear()`).
 
 ### Sinyal ve Metot Sözleşmesi
-- `file_selected(str)`: Yeni bir dosya yüklendiğinde dosya yolunu yayınlayan Qt Sinyali.
-- `set_file(path: str)`: Dosyayı programa alır, etiketleri günceller ve arayüzü yüklü duruma geçirir.
-- `clear()`: Seçili dosyayı temizler ve bileşeni boş duruma getirir.
-- `get_file_path() -> Optional[str]`: Seçili dosyanın mutlak yolunu döner.
+- `MAX_FILES = 25`: Tek bir işlemde seçilebilecek azami dosya adedi sabiti.
+- `file_selected(str)`: Yeni bir dosya yüklendiğinde ilk dosya yolunu yayınlayan geriye dönük uyumlu Qt Sinyali.
+- `files_selected(list)`: Doğrulanmış dosya yolları listesini (`list[str]`) yayınlayan birincil Qt Sinyali.
+- `validation_error(str)`: Format, karma uzantı veya maksimum adet kuralları ihlal edildiğinde hata metnini yayınlayan Qt Sinyali.
+- `validate_file_paths(paths: list[str]) -> tuple[bool, str, list[str]]`: Dosya listesini homojenlik, uzantı ve 25 dosya sınırına göre doğrulayan sınıf metodu.
+- `set_files(paths: list[str]) -> bool`: Dosya listesini doğrulayıp arayüze yükler, hata durumunda `validation_error` sinyali yayar.
+- `get_files() -> list[str]`: Seçili tüm dosya yollarının listesini döner.
+- `set_file(path: str)`: Tekil dosya atayan geriye dönük uyumlu metod (`set_files([path])` çağırır).
+- `clear()`: Seçili dosyaları temizler ve bileşeni boş duruma getirir.
+- `get_file_path() -> Optional[str]`: İlk seçili dosyanın mutlak yolunu döner (geriye dönük uyumlu).
 
 ---
 
-## 4. ExtractionWorker QThread Asenkron Mimarisi
+## 4. BatchExtractionWorker ve ExtractionWorker Asenkron İşleme Mimarisi
 
-Kast çıkarma süreci (özellikle LibreOffice ile PDF sayfa eşleme veya büyük Word senaryolarının OpenXML analizi) yoğun CPU ve I/O işlemi gerektirir. Ana arayüz iş parçacığının (GUI main thread) kilitlenmesini önlemek için `ExtractionWorker(QThread)` mimarisi kullanılır:
+Kast çıkarma süreci (özellikle LibreOffice ile PDF sayfa eşleme veya büyük Word senaryolarının OpenXML analizi) yoğun CPU ve I/O işlemi gerektirir. Ana arayüz iş parçacığının (GUI main thread) donmasını engellemek ve LibreOffice / Word kilitlenmelerini önlemek amacıyla [[adr-007-batch-file-processing-pipeline]] kararı uyarınca sıralı ve hata toleranslı `BatchExtractionWorker(QThread)` mimarisi kullanılır.
 
-### Sinyal Arayüzü
+### Sıralı Yürütme Mimarisi (Concurrency = 1)
+Toplu dosya işleme sürecinde paralel iş parçacığı (`QThreadPool` / çoklu thread) yerine bilhassa **sıralı yürütme (`concurrency = 1`)** tercih edilmiştir:
+1. **LibreOffice Profil Kilidi Güvenliği:** Headless LibreOffice (`soffice`) motoru arka planda kullanıcı profil dizininde `.lock` kilit dosyası oluşturur. Birden fazla süreç aynı anda çağrıldığında profil çekişmesi sebebiyle kilitlenmeler (deadlock) ve çökme hataları oluşur.
+2. **Microsoft Word COM Çakışmaları:** Windows Word COM otomasyonu tekil STA iş parçacığı modelinde çalışır; paralel çağrılarda `RPC_E_SERVERCALL_RETRYLATER` hataları fırlatır.
+3. **Sistem Kaynak Koruması:** Dublaj stüdyolarındaki iş istasyonlarında DAW (Pro Tools, Nuendo vb.) yazılımları aktifken aşırı CPU/RAM tüketiminin stüdyo kayıtlarını aksatması önlenir.
+
+### BatchExtractionWorker Sinyal Arayüzü
 
 | Sinyal | Parametre Tipleri | Görevi |
 | :--- | :--- | :--- |
-| `progress` | `int, str` | Yüzdelik ilerleme değeri (0-100) ve durum metni. |
-| `log` | `str` | Konsol alanına yazılacak renkli işlem günlüğü satırı. |
-| `finished` | `str, object` | Üretilen çıktı dosyasının yolu ve [[cast-extraction-result]] nesnesi. |
-| `error` | `str` | İşlem sırasında fırlatılan hata iletisi. |
+| `progress` | `int, str` | Yüzdelik genel ilerleme değeri (0-100) ve detaylı dosya durum metni. |
+| `log` | `str` | Konsol alanına yazılacak renkli ve biçimlendirilmiş işlem günlüğü satırı. |
+| `file_started` | `int, int, str` | Dosya başladığında `(current_index, total_files, filename)`. |
+| `file_completed` | `int, int, str, object` | Dosya başarıyla bittiğinde `(current_index, total_files, output_path, result)`. |
+| `file_error` | `int, int, str, str` | Dosyada hata çıktığında `(current_index, total_files, filename, error_msg)`. |
+| `all_finished` | `list` | Tüm dosyaların durum özetini (`list[dict]`) yayınlar. |
 
-### Yürütme ve Hata İzolasyonu (`run()`)
-Worker, `process_dubbing_file()` birleşik yönlendiricisini çağırır:
-```python
-output_path, result = process_dubbing_file(
-    input_path=self.file_path,
-    sort_by=self.sort_by,
-    in_place=self.in_place,
-    standalone=self.standalone,
-    progress_callback=lambda pct, msg: self.progress.emit(pct, msg)
-)
-self.finished.emit(output_path, result)
-```
-Olası `ValueError`, `FileNotFoundError` veya beklenmeyen istisnalar `except Exception as e` ile yakalanarak güvenle `error` sinyaliyle ana pencereye aktarılır; GUI kesinlikle çökmez.
+### İlerleme Matematiği (Progress Math)
+Toplu işleme sürecinde yüzdelik ilerleme çubuğu dosya adetlerine göre dilimlenir ve pürüzsüz biçimde ilerler:
+- Toplam $N$ dosya için dosya başına yüzdelik dilim: $P_{\text{file}} = 100.0 / N$.
+- $i$. dosya işlenirken ($i \in [0, N-1]$), taban yüzde: $\text{base\_pct} = \lfloor i \times P_{\text{file}} \rfloor$.
+- Dosya içindeki alt işlemden gelen yüzde $p \in [0, 100]$ şu formülle genel ilerlemeye ölçeklenir:
+  $$\text{overall\_pct} = \text{base\_pct} + \left\lfloor \frac{p \times P_{\text{file}}}{100.0} \right\rfloor$$
+- Bir dosya tamamlandığında genel ilerleme doğrudan bir sonraki dilime yükseltilir: $\lfloor (i + 1) \times P_{\text{file}} \rfloor$.
+- Tüm liste bittiğinde `%100` sinyaliyle süreç sonlanır. Bu matematik ilerlemenin sıçrama yapmadan monoton artmasını garanti eder.
+
+### Dosya Bazında Hata İzolasyonu ve Toleransı (Per-File Fault Tolerance)
+Worker, dosyaları tek tek sıralı döngüyle işler:
+- Her bir dosya bağımsız `try...except Exception as e` bloğunda çalıştırılır.
+- Bir dosyada `PermissionError`, `ValueError` veya bozuk XML gibi bir istisna oluşursa işlem durmaz; hata yakalanır, `file_error` sinyali yayılır, konsola kırmızı renkle yazılır ve özet tablosuna eklenir:
+  ```python
+  summary.append({
+      "file_path": path,
+      "output_path": None,
+      "result": None,
+      "status": "error",
+      "error": str(e)
+  })
+  ```
+- Sıradaki diğer dosyalar kesintisiz işlenmeye devam eder (`fail-fast` uygulanmaz).
+- Başarıyla tamamlanan dosyalar özet tablosuna eklenir:
+  ```python
+  summary.append({
+      "file_path": path,
+      "output_path": out_path,
+      "result": result,
+      "status": "success",
+      "error": None
+  })
+  ```
+- Tüm dosyalar tamamlandığında `all_finished(summary)` sinyaliyle tam liste ana pencereye iletilir.
+
+### Geriye Dönük Uyumluluk (`ExtractionWorker`)
+Eski tekil dosya işleme akışını ve testleri korumak için `ExtractionWorker`, `BatchExtractionWorker([file_path], ...)` sınıfından kalıtım alır:
+- `finished = Signal(str, object)` ve `error = Signal(str)` sinyallerini barındırır.
+- `all_finished` sinyalini dinleyerek ilk dosyanın başarı durumuna göre `finished` veya `error` yayar.
+- `is_single_compat` moduyla tekil dosya ilerleme ve log formatlarını tam geriye dönük uyumlu korur.
 
 ---
 
@@ -134,7 +192,15 @@ Olası `ValueError`, `FileNotFoundError` veya beklenmeyen istisnalar `except Exc
    - Sağ üst rozet: `lbl_badge` ("● Windows Studio Edition • Qt6", background `#0f293a`, border `1px solid #084c61`, color `#38bdf8`, padding `4px 12px`, border-radius `12px`).
 
 2. **Merkezi Bırakma Alanı (`DropZoneWidget`):**
-   - Dairesel bulut yükleme rozeti (`☁↑`), `.DOCX` ve `.PDF` format etiketleri ve dosya seçici entegre tekil bırakma alanı.
+   - 25 dosyaya kadar çoklu sürükle-bırak veya dosya seçici kabul eden korumalı girdi paneli.
+   - Dosya seçildiğinde `_on_files_selected(paths)` tetiklenir:
+     - Tekil dosyada dosya adı ve uzantı bilgisi konsola yazılır.
+     - Çoklu dosyada `N adet dosya seçildi` bilgisi günlüğe düşülür.
+     - PDF seçildiğinde `tile_inplace.setEnabled(False)` ve `tile_standalone.setChecked(True)` kuralı işletilir.
+     - Durum çubuğu metni önceki olası hataları temizleyerek `● Durum: Hazır` haline getirilir.
+   - Doğrulama hatasında `_on_validation_error(err_msg)` tetiklenir:
+     - Durum çubuğu kırmızı `● Hata: {err_msg}` metnine bürünür.
+     - Konsol günlüğüne kırmızı renkle hata kaydı yazılır.
 
 3. **İki Yan Yana Kart Paneli (`QFrame#card-panel`):**
    - **Sol Panel (`card_sort`):** `lbl_sort_title` ("🗂  Karakter Sıralama", `#38bdf8`) başlığı altında 3 adet `OptionTileWidget` kartı:
@@ -149,7 +215,6 @@ Olası `ValueError`, `FileNotFoundError` veya beklenmeyen istisnalar `except Exc
      - Kartlar radyo göstergesi, başlık ve opsiyonel camgöbeği alt metin içerir.
      - Tıklama veya programatik `setChecked(True)` çağrısı aynı gruptaki kardeş kartları otomatik olarak devreden çıkarır.
      - Geriye uyumluluk için `window.rb_appearance`, `window.rb_count`, `window.rb_name`, `window.rb_standalone`, `window.rb_inplace` takma adları korunmuştur.
-     - PDF seçildiğinde `tile_inplace.setEnabled(False)` ve `tile_standalone.setChecked(True)` kuralı işletilir.
 
 4. **Aksiyon Butonları:**
    - Geniş parlak camgöbeği `btn_extract` ("▶  Kast Tablosunu Çıkar", `btn-primary`, stretch=4).
@@ -163,9 +228,16 @@ Olası `ValueError`, `FileNotFoundError` veya beklenmeyen istisnalar `except Exc
    - Başlık satırı: `lbl_log_title` ("🖥  İŞLEM GÜNLÜĞÜ", `#64748b`, bold) ve `lbl_log_meta` ("UTF-8 / Terminal hazır", `#475569`, monospace).
    - Siyah stüdyo konsol kutusu (`QTextEdit`, `#080c14` zemin, `#cbd5e1` monospace metin).
 
-7. **Sonuç Rozet Kartı (`result_card`):**
-   - İşlem bittiğinde toplam karakter sayısı, replik adedi ve sayfa sayısını yeşil rozetle sunar.
-   - "📁 Klasörde Göster" ve "📄 Dosyayı Aç" yerel sistem entegrasyon butonları.
+7. **Dinamik Sonuç Rozet Kartı (`result_card`):**
+   - `BatchExtractionWorker` tamamlandığında `_on_batch_finished(summary)` tetiklenir ve sonuçlar analiz edilir:
+     - **Tam Başarı (0 Hata):** Yeşil (`#10b981`) rozetle toplam karakter sayısı, replik adedi ve işlenen dosya oranı (`✓ M/N dosya başarıyla oluşturuldu! (Toplam: X Karakter • Y Replik)`).
+     - **Kısmi Hata (`len(successes) > 0 and len(errors) > 0`):** Kehribar sarısı (`#f59e0b`) rozetle `⚠️ Kısmi Tamamlandı: M/N başarılı, K dosyada hata oluştu.`
+     - **Tam Başarısızlık (`len(successes) == 0`):** Kırmızı (`#f43f5e`) rozetle `❌ İşlem Başarısız: K/N dosyada hata oluştu.`
+   - **Aksiyon Butonları Uyarlaması:**
+     - Tekil dosyada: `"📄 Dosyayı Aç"`.
+     - Çoklu dosyada: `"📄 Son Dosyayı Aç"`.
+     - En az bir başarılı dosya varsa ve `last_output_file` mevcutsa buton aktifleşir; aksi halde pasifleşir.
+     - "📁 Klasörde Göster" butonu ile yerel dosya gezgini son çıktının bulunduğu dizini açar.
 
 8. **Durum Çubuğu (StatusBar):**
    - Sol: `lbl_status_left` ("PySide6 Modern Frame  |  Hazır").
@@ -176,8 +248,8 @@ Olası `ValueError`, `FileNotFoundError` veya beklenmeyen istisnalar `except Exc
    - PyInstaller demetlerinde `sys._MEIPASS` desteğiyle ikonun gömülü paket içinden sorunsuz bulunması sağlanır.
 
 10. **Dinamik Mizanpaj ve QScrollArea Taşıyıcısı:**
-   - Düşük çözünürlüklü ekranlar veya tam ekran olmayan pencereli kullanımlarda bileşenlerin ezilmesini ve metinlerin 0 yüksekliğe düşmesini önlemek için merkezi widget `QScrollArea` (`scroll_area`) ile sarmalanmıştır.
-   - `OptionTileWidget` ve `DropZoneWidget` bileşenleri sabit/minimum yükseklik ve `QSizePolicy.Fixed` dikey boyutuyla korunur; pencere büyütüldüğünde veya tam ekrana alındığında ekstra dikey alan `log_area` konsoluna aktarılır (`stretch=1`).
+    - Düşük çözünürlüklü ekranlar veya tam ekran olmayan pencereli kullanımlarda bileşenlerin ezilmesini önlemek için merkezi widget `QScrollArea` (`scroll_area`) ile sarmalanmıştır.
+    - `OptionTileWidget` ve `DropZoneWidget` bileşenleri sabit/minimum yükseklik ve `QSizePolicy.Fixed` dikey boyutuyla korunur; pencere büyütüldüğünde ekstra dikey alan `log_area` konsoluna aktarılır (`stretch=1`).
 
 ---
 
@@ -185,19 +257,20 @@ Olası `ValueError`, `FileNotFoundError` veya beklenmeyen istisnalar `except Exc
 
 Masaüstü arayüzü farklı kullanım senaryolarına göre başlatılabilir:
 
-- **Bağımsız Windows Paketi (PyInstaller):** Python gerektirmeyen `dist/KastStudio/` dağıtımı, `packaging/run_gui.py` giriş noktası üzerinden doğrudan konsolsuz çalışır ([[pyinstaller-standalone-packaging]]).
-- **Windows Masaüstü / Çift Tıklama:** Kurulumda oluşturulan `kast-gui.cmd` dosyası sanal ortamı (`.venv`) otomatik bağlayarak doğrudan GUI penceresini açar.
-- **Komut Satırı:** `kast --gui` veya `kast -g` parametresi hibrit başlatıcı ([[hybrid-cli-dispatcher]]) tarafından yakalanıp `launch_gui()` fonksiyonunu çalıştırır.
-- **Otomatik Kurulum:** Windows için `install.ps1` betiği `PySide6` kütüphanesini sanal ortama kurar ve `%USERPROFILE%\bin\kast-gui.cmd` dosyasını oluşturur ([[cross-platform-installers]]).
+- **Bağımsız Windows Kurulum ve Taşınabilir Paketleri (Zero-Python):** Son kullanıcılar için üretilen `Kast-vX.Y.Z-Setup.exe` kurulum sihirbazı veya `Kast-vX.Y.Z-Windows-Portable.zip` dağıtımı, Python kurulumu gerektirmeden doğrudan masaüstü/başlat menüsü kısayolları ve `KastStudio.exe` üzerinden konsolsuz çalışır ([[inno-setup-installer]], [[pyinstaller-standalone-packaging]]).
+- **Komut Satırı / Terminal Entegrasyonu:** `install.bat` / `install.ps1` veya `install.sh` betikleriyle geliştirici ortamı kurulduğunda, terminalden `kast --gui` veya `kast -g` komutu verilerek doğrudan Qt6 Studio arayüzü başlatılır ([[hybrid-cli-dispatcher]], [[cross-platform-installers]]). Bu sayede sisteme ayrı/fazladan bir başlatıcı dosya yüklenmeden tekil `kast` komutu üzerinden GUI'ye erişilir.
 
 ---
 
 ## 7. İlgili Sayfalar
 
 - [[adr-005-qt6-windows-studio-gui]] — Qt6 masaüstü grafik arayüzü mimari kararı.
+- [[adr-007-batch-file-processing-pipeline]] — Çoklu dosya seçimi ve sıralı toplu işleme mimari kararı.
 - [[pyinstaller-standalone-packaging]] — Bağımsız Windows PyInstaller paketleme ve çoklu ikon üretici.
 - [[hybrid-cli-dispatcher]] — CLI, TUI ve GUI başlatma mantığı.
 - [[cross-platform-installers]] — Windows batch başlatıcısı ve kurulum betikleri.
 - [[terminal-user-interface]] — Textual tabanlı terminal kullanıcı arayüzü.
 - [[dubbing-pdf-parser]] — PDF doğrudan senaryo ayrıştırma motoru.
+- [[dubbing-docx-parser]] — DOCX senaryo ayrıştırma motoru.
+- [[headless-pdf-converter]] — Headless LibreOffice ve Word COM dönüştürücü motoru.
 - [[cast-extraction-result]] — GUI sonuç kartına beslenen özet veri modeli.

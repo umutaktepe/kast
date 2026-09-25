@@ -55,7 +55,7 @@ git clone https://github.com/umutaktepe/kast.git
 cd kast
 chmod +x install.sh && ./install.sh
 ```
-*Bu script sanal ortamı kurar, bağımlılıkları yükler ve `~/.local/bin/kast` sembolik bağını oluşturur. Artık terminalinizin herhangi bir yerinden sadece `kast` yazmanız yeterlidir.*
+*Bu script sanal ortamı kurar, bağımlılıkları (TUI, GUI ve motor) yükler ve `~/.local/bin/kast` sembolik bağını oluşturur. Terminalden `kast` (TUI), `kast --gui` (Modern Qt6 GUI) veya `kast dosya.docx` (CLI) çalıştırabilirsiniz.*
 
 #### 🪟 Windows (Kaynak Kod / Geliştirici Betiği)
 ```cmd
@@ -64,7 +64,7 @@ cd kast
 install.bat
 ```
 *(Veya doğrudan `install.bat` dosyasına çift tıklayabilir ya da PowerShell ile `powershell -ExecutionPolicy Bypass -File .\install.ps1` çalıştırabilirsiniz).*
-*Bu script sanal ortamı kurar, bağımlılıkları yükler, `%USERPROFILE%\bin\kast-gui.cmd` ve `%USERPROFILE%\bin\kast.cmd` başlatıcılarını oluşturur ve Kullanıcı `PATH` ortam değişkenine otomatik ekler. Artık masaüstünden, Başlat/Çalıştır'dan veya terminalden `kast-gui` yazmanız yeterlidir.*
+*Bu script sanal ortamı kurar, bağımlılıkları (TUI, GUI ve motor) yükler, `%USERPROFILE%\bin\kast.cmd` başlatıcısını oluşturur ve Kullanıcı `PATH` ortam değişkenine ekler. Terminalden `kast` (TUI), `kast --gui` (Modern Qt6 GUI) veya `kast dosya.docx` (CLI) çalıştırabilirsiniz. (Doğrudan masaüstü grafik arayüzü uygulaması isteyen son kullanıcılar ise yukarıdaki hazır Windows Kurulum Sihirbazı veya Taşınabilir Sürümü tercih edebilir).*
 
 #### 🗑️ Programı Kaldırma (Uninstall)
 - **Kurulum Sihirbazı ile Kurulduysa:** Windows Ayarlar -> Uygulamalar (Program Ekle/Kaldır) üzerinden "Kast Studio" seçilerek tek tıkla kaldırılabilir.
@@ -77,13 +77,12 @@ install.bat
 
 ## 💻 Kullanım Şekilleri
 
-### 1. Modern Masaüstü Grafik Arayüzü (Qt6 Studio GUI) — Windows Stüdyoları İçin
+### 1. Modern Masaüstü Grafik Arayüzü (Qt6 Studio GUI)
 
-Windows kullanıcıları ve seslendirme stüdyoları için tasarlanmış piksel hassasiyetindeki grafiksel arayüz:
+Dublaj stüdyoları ve çevirmenler için tasarlanmış piksel hassasiyetindeki grafiksel arayüz:
 
-- **Çift Tıklama ile Başlatma:** Klasördeki `kast-gui.cmd` dosyasına doğrudan çift tıklayarak açabilirsiniz (veya sağ tıklayıp masaüstüne kısayol oluşturabilirsiniz).
-- **Çalıştır (Run) ile:** `Win + R` tuşlarına basıp `kast-gui` yazarak anında başlatabilirsiniz.
-- **Terminalden:** `kast-gui` veya `kast --gui`
+- **Doğrudan Masaüstü Uygulaması Olarak:** Sürümler (Releases) sayfasından indirilen `Kast-Setup.exe` ile kurulan masaüstü/başlat menüsü kısayolu üzerinden veya `Kast-Portable.zip` içerisindeki `KastStudio.exe` ile çift tıklayarak açabilirsiniz.
+- **Terminalden:** `kast --gui` komutuyla (hem Windows hem Linux/macOS üzerinde) anında başlatabilirsiniz.
 
 **Öne Çıkan Özellikler:**
 - **Sürükle-Bırak:** `.docx` veya `.pdf` senaryo dosyasını doğrudan bulut rozetli alana sürükleyip bırakın (ayrı referans PDF gerekmez).
