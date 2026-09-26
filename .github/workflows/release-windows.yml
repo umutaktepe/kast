@@ -42,9 +42,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Injecting version $env:VERSION into src/version.py"
-          (Get-Content src/version.py) -replace '__version__\s*=\s*".*?"', "__version__ = `"$env:VERSION`"" | Set-Content src/version.py
+          (Get-Content src/version.py) -replace '__static_version__\s*=\s*".*?"', "__static_version__ = `"$env:VERSION`"" | Set-Content src/version.py
           Write-Host "Updated src/version.py content:"
-          Get-Content src/version.py | Select-String "__version__"
+          Get-Content src/version.py | Select-String "version"
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5

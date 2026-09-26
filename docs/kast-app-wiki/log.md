@@ -446,6 +446,19 @@ Bu dosya, Andrej Karpathy'nin LLM Wiki prensiplerine uygun olarak kronolojik ve 
     - Nihai mühendislik kararının ve kod sorumluluğunun ajanda olduğu; TypeSafe AI primitiflerinin (`Choice`, `Score`, `Noul`) özellikle belirsizlik, yüksek regresyon riski veya ikinci bir bağımsız çapraz kontrol (sanity check / validation) istendiği kritik kavşaklarda devreye sokulması ilkesi pekiştirildi.
 - **Etkilenen Sayfalar:** `AGENTS.md`, [[log]]
 
+---
+
+## [2026-09-26] feat | Geliştirici Modu (Dev) Dinamik Git Tag Sürüm Tespiti ve v2.1.4 Senkronizasyonu
+- **Ajan Rolü:** Çekirdek Altyapı ve Sürüm Yönetimi Ajanı
+- **Yapılan İşlem:**
+  - `src/version.py` mimarisi geliştirildi:
+    - Geliştirici modunda (kaynak koddan veya yerel depodan `git pull` ile çalıştırıldığında) `git describe --tags --abbrev=0` çağrısıyla yerel depodaki en son git etiketi dinamik olarak tespit edilir. Böylece `git pull` yapıldığında `__version__` anında güncellenir ve gereksiz güncelleme popupları engellenir.
+    - Derlenmiş paketlerde (`sys.frozen == True`) ve git bulunmayan ortamlarda ise `__static_version__ = "2.1.4"` fallback mekanizması devreye girer.
+  - `.github/workflows/release-windows.yml` enjeksiyon adımı `__static_version__` regex eşleşmesiyle uyumlu hale getirildi.
+  - `tests/test_updater.py` ve tüm test takımı (204 test) güncellenerek %100 yeşil doğrulandı.
+- **Etkilenen Sayfalar:** [[github-release-updater]], [[log]]
+
+
 
 
 

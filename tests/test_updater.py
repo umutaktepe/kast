@@ -4,7 +4,8 @@ from src.version import __version__, parse_version, is_newer_version
 
 def test_version_string_format():
     """__version__ değişkeninin geçerli semver biçiminde olduğunu doğrular."""
-    assert __version__ == "2.1.1"
+    assert __version__ == "2.1.4"
+    assert parse_version(__version__) >= (2, 1, 4)
 
 
 def test_parse_version_standard_and_prefixed():
@@ -18,19 +19,19 @@ def test_parse_version_standard_and_prefixed():
 
 def test_is_newer_version_comparison():
     """is_newer_version fonksiyonunun sürüm karşılaştırmasını doğru yaptığını doğrular."""
-    assert is_newer_version("2.1.2", "2.1.1") is True
-    assert is_newer_version("v2.2.0", "2.1.1") is True
-    assert is_newer_version("v3.0.0", "2.1.1") is True
-    assert is_newer_version("2.1.1", "2.1.1") is False
-    assert is_newer_version("2.1.0", "2.1.1") is False
-    assert is_newer_version("v2.0.9", "2.1.1") is False
+    assert is_newer_version("2.1.5", "2.1.4") is True
+    assert is_newer_version("v2.2.0", "2.1.4") is True
+    assert is_newer_version("v3.0.0", "2.1.4") is True
+    assert is_newer_version("2.1.4", "2.1.4") is False
+    assert is_newer_version("2.1.0", "2.1.4") is False
+    assert is_newer_version("v2.0.9", "2.1.4") is False
 
 
 def test_init_exports_version():
     """src paketinin __version__ sembolünü dışa aktardığını doğrular."""
     import src
     assert hasattr(src, "__version__")
-    assert src.__version__ == "2.1.1"
+    assert src.__version__ == "2.1.4"
 
 
 from unittest.mock import MagicMock, patch

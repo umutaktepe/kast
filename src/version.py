@@ -1,9 +1,41 @@
-"""Version specification and semantic version comparison utilities for Kast."""
-
+import os
 import re
+import subprocess
+import sys
 from typing import Tuple
 
-__version__ = "2.1.1"
+__static_version__ = "2.1.4"
+
+
+def get_version() -> str:
+    """Return the application version string.
+
+    In frozen/standalone mode (PyInstaller), returns the static version injected during build.
+    In development mode (source checkout), dynamically resolves the latest git tag if available.
+    """
+    if getattr(sys, "frozen", False):
+        return __static_version__
+
+    try:
+        repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        tag = subprocess.check_output(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            cwd=repo_dir,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=1.5,
+        ).strip()
+        if tag:
+            clean = tag.lstrip("vV")
+            if re.match(r"^\d+(\.\d+)*", clean):
+                return clean
+    except Exception:
+        pass
+
+    return __static_version__
+
+
+__version__ = get_version()
 
 
 def parse_version(version_str: str) -> Tuple[int, ...]:
