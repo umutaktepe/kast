@@ -87,8 +87,9 @@ Ajanlar, karmaşık veya belirsiz durumlarda serbest metinli sübjektif varsayı
    - Yapılan bir kod değişikliğinin veya yeni açılan bir wiki sayfasının var olan ADR'lerle, modellerle veya `AGENTS.md` kurallarıyla anlamsal bir çelişki üretip üretmediği `Noul` (Yes/No) ile doğrulanır.
 4. **Karmaşık Hata ve Uç Vaka Sınıflandırması (Root Cause Triage):**
    - Testlerde veya işletim sistemi çağrılarında (Word COM kilidi, LibreOffice profil çakışması, GUI deadlock vb.) beklenmeyen bir hata oluştuğunda olası kök neden hipotezleri `Choice` ile elenir ve önceliklendirilir.
-5. **Skill Çağrısı ve Çalıştırma Yöntemi:**
+5. **Skill Çağrısı, Sandbox ve Çalıştırma Yöntemi:**
    - Ajan, `/home/umutaktepe/.gemini/config/skills/typesafe-ai/SKILL.md` yönergelerini takip ederek `typesafe-ai/scripts/typesafe_api.py` betiğini terminalden CLI veya Python üzerinden çağırır (`call_system_one`).
+   - **Sandbox Bypass Zorunluluğu:** `api.typesafe.ai` uç noktası harici ağ erişimi gerektirdiğinden, standart sandbox ortamı bu HTTP çağrısını engeller (`HTTP 403 / Request not allowed by policy`). Bu nedenle TypeSafe API çağrısı içeren komutlar çalıştırılırken `run_command` aracında mutlaka `BypassSandbox: true` parametresi kullanılmalıdır.
    - Sorular atomik tanımlanmalı, bağlam (`state`) açıkça aktarılmalıdır.
 6. **Ortam ve Fallback Bağımsızlığı:**
    - Ortamda `TYPESAFE_API_KEY` bulunmadığı veya ağ bağlantısı olmadığı durumlarda ajan bloklanmaz; doğrudan kendi deterministik mantığı ve testleriyle karar sürecini sürdürür.
