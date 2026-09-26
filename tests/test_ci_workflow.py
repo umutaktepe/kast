@@ -84,11 +84,19 @@ def test_workflow_build_steps():
 
     # 2. Determine Version
     version_step = next(
-        (s for s in steps if "version" in s.get("name", "").lower() or "version" in s.get("run", "").lower()),
+        (s for s in steps if "determine version" in s.get("name", "").lower()),
         None
     )
     assert version_step is not None, "VERSION belirleme adımı eksik."
     assert "$env:GITHUB_ENV" in version_step.get("run", ""), "Version GITHUB_ENV ortamına yazılmalı."
+
+    # 2b. Inject Version into Source
+    inject_step = next(
+        (s for s in steps if "inject version" in s.get("name", "").lower()),
+        None
+    )
+    assert inject_step is not None, "src/version.py enjeksiyon adımı eksik."
+    assert "src/version.py" in inject_step.get("run", ""), "Enjeksiyon src/version.py dosyasını hedeflemeli."
 
     # 3. Setup Python
     python_step = next((s for s in steps if "actions/setup-python" in str(s.get("uses", ""))), None)

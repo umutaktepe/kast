@@ -167,6 +167,18 @@ hiddenimports = [
 
 ---
 
+## 6. CI/CD Otomatik Sürüm Enjeksiyonu (`release-windows.yml`)
+
+Geliştiricinin her sürümde `src/version.py` dosyasını elle düzenleme zorunluluğunu ortadan kaldırmak için, GitHub Actions iş akışına (`.github/workflows/release-windows.yml`) otomatik enjeksiyon adımı eklenmiştir:
+- **Tetikleme Biçimi Bağımsızlığı:** İş akışı ister web üzerinden manuel (`workflow_dispatch`), ister terminalden etiket push'u (`push: tags: 'v*'`) ile tetiklensin; belirlenen `VERSION` değeri derleme başlamadan hemen önce `src/version.py` dosyasına enjekte edilir:
+  ```powershell
+  (Get-Content src/version.py) -replace '__version__\s*=\s*".*?"', "__version__ = `"$env:VERSION`"" | Set-Content src/version.py
+  ```
+- **Hedef Commit Bütünlüğü:** `softprops/action-gh-release@v2` adımında `target_commitish: ${{ github.sha }}` tanımlanarak, web üzerinden manuel tetiklenen sürümlerin de daima en son commit'e (HEAD) bağlanması garanti edilmiştir.
+- **Kazanım:** Derlenen Windows `.exe` ve `.zip` paketleri, çalışma zamanında tam olarak release sürüm numarasını raporlar; kod tabanında statik dosya düzenleme ihtiyacı tamamen ortadan kaldırılmıştır.
+
+---
+
 ## İlgili Sayfalar
 
 - [[adr-008-in-app-github-release-updater]]
@@ -176,3 +188,4 @@ hiddenimports = [
 - [[github-actions-release-workflow]]
 - [[index]]
 - [[log]]
+

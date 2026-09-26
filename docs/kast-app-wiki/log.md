@@ -424,5 +424,18 @@ Bu dosya, Andrej Karpathy'nin LLM Wiki prensiplerine uygun olarak kronolojik ve 
     - Yapılan kural güncellemesi `typesafe_api.py` (System One `jev-1.13.0`) modeli üzerinden `Noul` (çelişki: %20) ve `Choice` (açıklık: %70 highly_actionable) çağrılarıyla doğrulanarak uygulandı.
 - **Etkilenen Sayfalar:** `AGENTS.md`, [[log]]
 
+---
+
+## [2026-09-26] feat | GitHub Actions CI/CD Otomatik Sürüm Enjeksiyonu ve Commit Bütünlüğü
+- **Ajan Rolü:** CI/CD ve Otomasyon Ajanı
+- **Yapılan İşlem:**
+  - `.github/workflows/release-windows.yml` dosyasına `Inject Version into Source` adımı eklendi:
+    - İster web arayüzünden (`workflow_dispatch`), ister terminalden (`git tag`) tetiklensin, hedeflenen sürüm numarası (`VERSION`) derleme öncesinde `src/version.py` dosyasına otomatik olarak enjekte edilir (`(Get-Content src/version.py) -replace ...`).
+    - Böylece derlenen `.exe` ve `.zip` paketleri çalışma zamanında tam olarak release sürüm numarasını bilir; geliştiricinin dosyayı elle düzenleme gereksinimi ortadan kaldırıldı.
+  - `Publish GitHub Release` adımına `target_commitish: ${{ github.sha }}` eklenerek, web üzerinden tetiklenen yayınların daima en güncel commit'e (HEAD) bağlanması güvence altına alındı.
+  - `tests/test_ci_workflow.py` test dosyasına enjeksiyon adımını denetleyen birim testi eklendi; tüm testler (204 adet) %100 yeşil doğrulandı.
+- **Etkilenen Sayfalar:** [[github-release-updater]], [[github-actions-release-workflow]], [[log]]
+
+
 
 

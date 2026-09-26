@@ -38,6 +38,14 @@ jobs:
           Write-Host "Target Version: $ver"
           "VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Inject Version into Source
+        shell: pwsh
+        run: |
+          Write-Host "Injecting version $env:VERSION into src/version.py"
+          (Get-Content src/version.py) -replace '__version__\s*=\s*".*?"', "__version__ = `"$env:VERSION`"" | Set-Content src/version.py
+          Write-Host "Updated src/version.py content:"
+          Get-Content src/version.py | Select-String "__version__"
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -85,6 +93,7 @@ jobs:
         with:
           tag_name: v${{ env.VERSION }}
           name: Kast Studio v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
             dist/Kast-v${{ env.VERSION }}-Setup.exe
