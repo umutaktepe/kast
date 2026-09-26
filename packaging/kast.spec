@@ -31,6 +31,9 @@ hiddenimports = [
     "pdfplumber",
     "pypdf",
     "PIL",
+    "src.version",
+    "src.updater",
+    "src.updater_gui",
 ]
 
 excludes = [

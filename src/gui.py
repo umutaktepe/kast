@@ -3,12 +3,13 @@ import subprocess
 import sys
 from typing import Dict, Optional
 
-from PySide6.QtCore import Qt, QThread, Signal, Slot
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import QRectF, Qt, QThread, QTimer, Signal, Slot
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
     QCheckBox,
+    QDialog,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QRadioButton,
@@ -27,8 +29,42 @@ from PySide6.QtWidgets import (
 )
 
 from kast import process_dubbing_file
+from src.updater import detect_distribution_type
+from src.updater_gui import (
+    UpdateCheckWorker,
+    UpdateNotificationDialog,
+    UpdateDownloadDialog,
+)
+from src.version import __version__
 
 ROOT_DIR = getattr(sys, "_MEIPASS", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+
+def create_refresh_icon(color: str = "#38bdf8", size: int = 14) -> QIcon:
+    """Create a crisp vector circular refresh icon for the update button."""
+    pix = QPixmap(size, size)
+    pix.fill(Qt.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.Antialiasing)
+    pen = QPen(QColor(color))
+    pen.setWidthF(1.8)
+    pen.setCapStyle(Qt.RoundCap)
+    p.setPen(pen)
+
+    # 270 degree circular arc
+    rect = QRectF(1.5, 1.5, size - 3, size - 3)
+    p.drawArc(rect, 45 * 16, 270 * 16)
+
+    # Arrow head at the end of the arc
+    p.setBrush(QColor(color))
+    arrow = QPainterPath()
+    arrow.moveTo(size - 1.0, 3.5)
+    arrow.lineTo(size - 4.5, 2.5)
+    arrow.lineTo(size - 3.0, 6.5)
+    arrow.closeSubpath()
+    p.drawPath(arrow)
+    p.end()
+    return QIcon(pix)
 
 
 class StudioTheme:
@@ -48,7 +84,10 @@ class StudioTheme:
         "accent_cyan": "#38bdf8",
         "btn_primary": "#00b4d8",
         "btn_primary_hover": "#38bdf8",
+        "btn_primary_pressed": "#0284c7",
         "btn_secondary": "#162033",
+        "btn_secondary_hover": "#1e2e4a",
+        "btn_secondary_pressed": "#0a0f1d",
         "terminal_bg": "#080c14",
         "badge_bg": "#0f293a",
         "badge_border": "#084c61",
@@ -69,6 +108,10 @@ class StudioTheme:
         QWidget {{
             color: {c["text_main"]};
             font-family: 'Segoe UI', Inter, -apple-system, sans-serif;
+        }}
+        QPushButton {{
+            font-family: 'Segoe UI', Inter, -apple-system, sans-serif;
+            outline: none;
         }}
         QFrame#card-panel {{
             background-color: {c["card_bg"]};
@@ -101,30 +144,66 @@ class StudioTheme:
             color: #031726;
             font-size: 14px;
             font-weight: 800;
-            padding: 11px 24px;
-            border: none;
+            padding: 10px 24px;
+            border: 1px solid transparent;
             border-radius: 8px;
         }}
         QPushButton#btn-primary:hover {{
             background-color: {c["btn_primary_hover"]};
+            border-color: #7dd3fc;
+        }}
+        QPushButton#btn-primary:pressed {{
+            background-color: {c["btn_primary_pressed"]};
+            border-color: #0369a1;
+            padding-top: 12px;
+            padding-bottom: 8px;
         }}
         QPushButton#btn-primary:disabled {{
             background-color: #1e293b;
             color: #475569;
+            border-color: transparent;
         }}
         QPushButton#btn-clear {{
             background-color: {c["btn_secondary"]};
             color: {c["text_sub"]};
             border: 1px solid {c["border"]};
             border-radius: 8px;
-            padding: 11px 20px;
+            padding: 10px 20px;
             font-size: 13px;
             font-weight: 600;
         }}
         QPushButton#btn-clear:hover {{
-            background-color: #1e2e4a;
+            background-color: {c["btn_secondary_hover"]};
             border-color: #334155;
             color: #ffffff;
+        }}
+        QPushButton#btn-clear:pressed {{
+            background-color: {c["btn_secondary_pressed"]};
+            border-color: #38bdf8;
+            color: #38bdf8;
+            padding-top: 12px;
+            padding-bottom: 8px;
+        }}
+        QPushButton#btn-action-secondary {{
+            background-color: #162238;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            color: #cbd5e1;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 600;
+        }}
+        QPushButton#btn-action-secondary:hover {{
+            background-color: #1e2e4a;
+            border-color: #38bdf8;
+            color: #ffffff;
+        }}
+        QPushButton#btn-action-secondary:pressed {{
+            background-color: #0a0f1d;
+            border-color: #0284c7;
+            color: #38bdf8;
+            padding-top: 8px;
+            padding-bottom: 4px;
         }}
         QProgressBar {{
             background-color: #111a2e;
@@ -249,6 +328,7 @@ class DropZoneWidget(QFrame):
         # Browse Button
         self.btn_browse = QPushButton("☁  Dosya Seç")
         self.btn_browse.setFixedHeight(28)
+        self.btn_browse.setCursor(Qt.PointingHandCursor)
         self.btn_browse.setStyleSheet("""
             QPushButton {
                 background-color: #162238;
@@ -261,8 +341,15 @@ class DropZoneWidget(QFrame):
             }
             QPushButton:hover {
                 background-color: #1e2e4a;
-                border-color: #0284c7;
+                border-color: #38bdf8;
                 color: #ffffff;
+            }
+            QPushButton:pressed {
+                background-color: #0a0f1d;
+                border-color: #0284c7;
+                color: #38bdf8;
+                padding-top: 6px;
+                padding-bottom: 2px;
             }
         """)
         self.btn_browse.clicked.connect(self._open_file_dialog)
@@ -294,7 +381,28 @@ class DropZoneWidget(QFrame):
         info_box.addWidget(self.lbl_filesize)
 
         self.btn_remove = QPushButton("✕ Değiştir")
-        self.btn_remove.setStyleSheet("background: #f43f5e; color: #ffffff; border: none; padding: 6px 14px; font-weight: bold; border-radius: 6px;")
+        self.btn_remove.setCursor(Qt.PointingHandCursor)
+        self.btn_remove.setStyleSheet("""
+            QPushButton {
+                background-color: #f43f5e;
+                color: #ffffff;
+                border: 1px solid transparent;
+                padding: 5px 14px;
+                font-weight: bold;
+                border-radius: 6px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #fb7185;
+                border-color: #fda4af;
+            }
+            QPushButton:pressed {
+                background-color: #be123c;
+                border-color: #9f1239;
+                padding-top: 7px;
+                padding-bottom: 3px;
+            }
+        """)
         self.btn_remove.clicked.connect(self.clear)
 
         loaded_layout.addWidget(self.lbl_badge)
@@ -787,13 +895,14 @@ class KastStudioWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Kast 2.0 — Dublaj Çevirisi Kast Çıkarma (Windows Studio Edition)")
-        self.resize(860, 740)
+        self.resize(860, 880)
         self.setMinimumSize(740, 520)
         self.setStyleSheet(StudioTheme.get_stylesheet())
 
         self.last_output_file: Optional[str] = None
         self.batch_worker: Optional[BatchExtractionWorker] = None
         self.worker: Optional[BatchExtractionWorker] = None
+        self.update_worker: Optional[UpdateCheckWorker] = None
 
         # Pencere ve görev çubuğu ikonu
         icon_paths = [
@@ -808,11 +917,14 @@ class KastStudioWindow(QMainWindow):
 
         self._init_ui()
 
+        # Başlangıçtan 1.5 sn sonra sessiz otomatik güncelleme kontrolü
+        QTimer.singleShot(1500, self._auto_check_updates)
+
     def _init_ui(self) -> None:
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.NoFrame)
-        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         central = QWidget()
@@ -822,11 +934,14 @@ class KastStudioWindow(QMainWindow):
         main_layout.setSpacing(12)
 
         # 1. Header
-        header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_vbox = QVBoxLayout()
+        header_vbox.setSpacing(6)
+        header_vbox.setContentsMargins(0, 0, 0, 0)
 
-        title_vbox = QVBoxLayout()
-        title_vbox.setSpacing(4)
+        # Üst satır: Sol tarafta Başlık, sağ tarafta Güncelleme Butonu ve Badge
+        top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setSpacing(10)
 
         title_hbox = QHBoxLayout()
         title_hbox.setSpacing(0)
@@ -836,13 +951,44 @@ class KastStudioWindow(QMainWindow):
         self.lbl_title_suffix.setStyleSheet("font-size: 20px; font-weight: bold; color: #f8fafc;")
         title_hbox.addWidget(self.lbl_title_prefix)
         title_hbox.addWidget(self.lbl_title_suffix)
-        title_hbox.addStretch()
 
-        self.lbl_subtitle = QLabel("Çeviri belgelerindeki diyalogları ve karakter listesini otomatik analiz eder.")
-        self.lbl_subtitle.setStyleSheet("font-size: 13px; color: #64748b;")
+        top_row.addLayout(title_hbox)
+        top_row.addStretch()
 
-        title_vbox.addLayout(title_hbox)
-        title_vbox.addWidget(self.lbl_subtitle)
+        # Güncelleme Kontrol Butonu
+        self.btn_check_updates = QPushButton("Güncellemeleri Denetle")
+        self.btn_check_updates.setObjectName("btn-check-updates")
+        self.btn_check_updates.setIcon(create_refresh_icon(color="#38bdf8", size=14))
+        self.btn_check_updates.setCursor(Qt.PointingHandCursor)
+        self.btn_check_updates.setStyleSheet("""
+            QPushButton#btn-check-updates {
+                background-color: #0f1c2e;
+                border: 1px solid #1e3a5f;
+                color: #94a3b8;
+                padding: 4px 10px;
+                border-radius: 12px;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            QPushButton#btn-check-updates:hover {
+                background-color: #162a45;
+                color: #38bdf8;
+                border-color: #38bdf8;
+            }
+            QPushButton#btn-check-updates:pressed {
+                background-color: #09121f;
+                color: #38bdf8;
+                border-color: #0284c7;
+                padding-top: 6px;
+                padding-bottom: 2px;
+            }
+            QPushButton#btn-check-updates:disabled {
+                background-color: #0d1522;
+                border-color: #152238;
+                color: #475569;
+            }
+        """)
+        self.btn_check_updates.clicked.connect(self._manual_check_updates)
 
         self.lbl_badge = QLabel("● Windows Studio Edition • Qt6")
         self.lbl_badge.setStyleSheet("""
@@ -855,10 +1001,17 @@ class KastStudioWindow(QMainWindow):
             font-weight: bold;
         """)
 
-        header_layout.addLayout(title_vbox)
-        header_layout.addStretch()
-        header_layout.addWidget(self.lbl_badge, alignment=Qt.AlignTop | Qt.AlignRight)
-        main_layout.addLayout(header_layout)
+        top_row.addWidget(self.btn_check_updates, alignment=Qt.AlignVCenter | Qt.AlignRight)
+        top_row.addWidget(self.lbl_badge, alignment=Qt.AlignVCenter | Qt.AlignRight)
+
+        # Alt satır: Açıklama alt başlığı
+        self.lbl_subtitle = QLabel("Çeviri belgelerindeki diyalogları ve karakter listesini otomatik analiz eder.")
+        self.lbl_subtitle.setStyleSheet("font-size: 13px; color: #64748b;")
+        self.lbl_subtitle.setWordWrap(True)
+
+        header_vbox.addLayout(top_row)
+        header_vbox.addWidget(self.lbl_subtitle)
+        main_layout.addLayout(header_vbox)
 
         # 2. Central Drop Zone
         self.drop_zone = DropZoneWidget()
@@ -941,12 +1094,14 @@ class KastStudioWindow(QMainWindow):
         self.btn_extract = QPushButton("▶  Kast Tablosunu Çıkar")
         self.btn_extract.setObjectName("btn-primary")
         self.btn_extract.setFixedHeight(40)
+        self.btn_extract.setCursor(Qt.PointingHandCursor)
         self.btn_extract.setEnabled(False)
         self.btn_extract.clicked.connect(self._start_extraction)
 
         self.btn_clear = QPushButton("🗑  Temizle")
         self.btn_clear.setObjectName("btn-clear")
         self.btn_clear.setFixedHeight(40)
+        self.btn_clear.setCursor(Qt.PointingHandCursor)
         self.btn_clear.clicked.connect(self._clear_all)
 
         btn_layout.addWidget(self.btn_extract, stretch=4)
@@ -985,11 +1140,13 @@ class KastStudioWindow(QMainWindow):
         self.lbl_result_text.setStyleSheet("color: #10b981; font-weight: bold; font-size: 13px;")
 
         self.btn_open_folder = QPushButton("📁 Klasörde Göster")
-        self.btn_open_folder.setStyleSheet("background-color: #162238; border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; padding: 6px 14px; font-weight: 600;")
+        self.btn_open_folder.setObjectName("btn-action-secondary")
+        self.btn_open_folder.setCursor(Qt.PointingHandCursor)
         self.btn_open_folder.clicked.connect(self._open_output_folder)
 
         self.btn_open_file = QPushButton("📄 Dosyayı Aç")
-        self.btn_open_file.setStyleSheet("background-color: #162238; border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; padding: 6px 14px; font-weight: 600;")
+        self.btn_open_file.setObjectName("btn-action-secondary")
+        self.btn_open_file.setCursor(Qt.PointingHandCursor)
         self.btn_open_file.clicked.connect(self._open_output_file)
 
         res_layout.addWidget(self.lbl_result_text, stretch=2)
@@ -1252,6 +1409,73 @@ class KastStudioWindow(QMainWindow):
             subprocess.run(["open", self.last_output_file])
         else:
             subprocess.run(["xdg-open", self.last_output_file])
+
+    def _auto_check_updates(self) -> None:
+        """Perform a silent background update check on application startup."""
+        self._start_update_check(is_manual=False)
+
+    def _manual_check_updates(self) -> None:
+        """Triggered by the user clicking the Check Updates button."""
+        self.btn_check_updates.setEnabled(False)
+        self.btn_check_updates.setText("Denetleniyor...")
+        self.btn_check_updates.setIcon(create_refresh_icon(color="#64748b", size=14))
+        self._start_update_check(is_manual=True)
+
+    def _start_update_check(self, is_manual: bool) -> None:
+        dist_type = detect_distribution_type()
+        self.update_worker = UpdateCheckWorker(
+            current_version=__version__,
+            dist_type=dist_type,
+            parent=self,
+        )
+        self.update_worker.check_finished.connect(
+            lambda has_up, rel, err: self._handle_update_check_result(has_up, rel, err, is_manual)
+        )
+        self.update_worker.start()
+
+    def _handle_update_check_result(
+        self,
+        has_update: bool,
+        release_info: object,
+        error_msg: str,
+        is_manual: bool,
+    ) -> None:
+        if is_manual:
+            self.btn_check_updates.setEnabled(True)
+            self.btn_check_updates.setText("Güncellemeleri Denetle")
+            self.btn_check_updates.setIcon(create_refresh_icon(color="#38bdf8", size=14))
+
+        if error_msg:
+            if is_manual:
+                QMessageBox.warning(
+                    self,
+                    "Güncelleme Denetimi",
+                    f"Güncellemeler denetlenirken bir sorun oluştu:\n{error_msg}",
+                )
+            return
+
+        if has_update and release_info:
+            dist_type = detect_distribution_type()
+            dialog = UpdateNotificationDialog(
+                current_version=__version__,
+                release_info=release_info,
+                dist_type=dist_type,
+                parent=self,
+            )
+            if dialog.exec() == QDialog.Accepted:
+                download_dialog = UpdateDownloadDialog(
+                    release_info=release_info,
+                    dist_type=dist_type,
+                    parent=self,
+                )
+                download_dialog.exec()
+        else:
+            if is_manual:
+                QMessageBox.information(
+                    self,
+                    "Kast Studio Güncel",
+                    f"Harika! En güncel Kast Studio sürümünü (v{__version__}) kullanıyorsunuz.",
+                )
 
 
 def launch_gui() -> int:

@@ -29,6 +29,7 @@ Proje, sıralı kitap bölümleri yerine fonksiyonel mimari rollere ve Obsidian 
 - [[adr-005-qt6-windows-studio-gui]] — Windows stüdyo ortamları için PySide6 tabanlı stüdyo temalı, sürükle-bırak destekli ve QThread iş parçacıklı masaüstü GUI mimarisi.
 - [[adr-006-windows-standalone-installer-and-ci]] — Windows için PyInstaller klasör demeti, Inno Setup akıllı ofis tespiti (Word/LibreOffice sessiz kurulumu) ve GitHub Actions CI/CD yayın mimarisi.
 - [[adr-007-batch-file-processing-pipeline]] — 25 dosya sınırı, homojen uzantı kuralı ve LibreOffice/Word kilit koruması için sıralı (concurrency=1) çoklu dosya toplu işleme mimarisi.
+- [[adr-008-in-app-github-release-updater]] — GitHub Releases API üzerinden otomatik ve tek tıkla güncelleme denetimi, Inno Setup (.exe) vs Portable (.zip) paket tespiti ve Windows dosya kilidi korumalı kurulum mimarisi.
 
 ---
 
@@ -80,6 +81,7 @@ Proje, sıralı kitap bölümleri yerine fonksiyonel mimari rollere ve Obsidian 
 - [[pyinstaller-standalone-packaging]] — Bağımsız Windows PyInstaller paketleme (`kast.spec`), konsolsuz giriş noktası (`run_gui.py`) ve çoklu çözünürlüklü ikon üretici (`generate_icon.py`).
 - [[inno-setup-installer]] — Inno Setup 6 kurulum sihirbazı (`installer.iss`), sistemde Word/LibreOffice arayan Pascal scriptleri ve sessiz LibreOffice kurulumu.
 - [[github-actions-release-workflow]] — Windows ikili ve kurulum paketlerini derleyip GitHub Releases üzerinde yayımlayan tam otomatik CI/CD iş akışı (`release-windows.yml`).
+- [[github-release-updater]] — GitHub Releases API istemcisi, `unins000.exe` tabanlı dağıtım tespiti, QThread asenkron kontrol/indirme iş parçacıkları, StudioTheme bildirim ve indirme diyalogları ile Windows dosya kilidi çözümü.
 - [[cross-platform-installers]] — Linux (`install.sh`), Windows (`install.ps1`, `install.bat`) ve kabuk başlatıcıları (`bin/kast`, `kast.cmd`).
 
 ---

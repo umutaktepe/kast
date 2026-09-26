@@ -345,6 +345,73 @@ Bu dosya, Andrej Karpathy'nin LLM Wiki prensiplerine uygun olarak kronolojik ve 
     - Madde 1 altındaki `core-models` tanımından ve Madde 2 altındaki ADR kütüphane örneklerinden yanlış gömülü TypeSafe ifadeleri temizlendi.
 - **Etkilenen Sayfalar:** `AGENTS.md`, [[log]]
 
+---
 
+## [2026-09-26] feat | GUI Güncelleme Entegrasyonu, Açılış Otomasyonu ve PyInstaller Uyumu (Task 4)
+- **Ajan Rolü:** Task 4 Kodlama ve GUI Entegrasyon Ajanı
+- **Yapılan İşlem:**
+  - `src/gui.py` içine güncelleme sistemi entegre edildi:
+    - Header paneline "🔄 Güncellemeleri Denetle" (`btn_check_updates`) butonu eklendi.
+    - Açılıştan 1.5 saniye sonra başlayan sessiz arka plan kontrolü (`QTimer.singleShot(1500, self._auto_check_updates)`) tanımlandı.
+    - Manuel kontrolde buton durumu ("🔄 Denetleniyor..."), güncel sürümde `QMessageBox.information`, hata durumunda `QMessageBox.warning` diyalogları bağlandı.
+    - Güncelleme bulunduğunda `UpdateNotificationDialog` ve kabul edildiğinde `UpdateDownloadDialog` akışı bağlandı.
+    - `src/updater_gui.py` ile `src/gui.py` arasındaki dairesel import (`StudioTheme`) `_get_theme_stylesheet()` yardımcı fonksiyonu ile çözüldü.
+  - `packaging/kast.spec` dosyasına `src.version`, `src.updater`, `src.updater_gui` gizli modülleri (`hiddenimports`) eklendi.
+  - `tests/test_gui.py` içine GUI entegrasyon testleri eklendi; 5 güncelleme testi, 72 updater/GUI testi ve 204 genel regresyon testinin tamamı başarıyla geçti.
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[pyinstaller-standalone-packaging]], [[log]]
+
+---
+
+## [2026-09-26] docs | ADR-008 In-App GitHub Releases Updater ve Yaşayan Mimari Dokümantasyonu (Task 5)
+- **Ajan Rolü:** Living Architecture ve Dokümantasyon Ajanı
+- **Yapılan İşlem:**
+  - `adr-008-in-app-github-release-updater.md` mimari karar kaydı yayımlandı:
+    - GitHub Releases REST API üzerinden asenkron güncelleme kontrolü, Inno Setup (`unins000.exe`) ve Portable ZIP ayrımı, sıfır dış bağımlılık prensibi ve Windows çalışan dosya kilidi (`ERROR_ACCESS_DENIED`) çözümü (detached installer / batch PID bekleme ve robocopy) belgelendi.
+    - Zorunlu 5 bölüm (Bağlam, Karar, Alternatifler, Sonuçlar ve Etkiler, İlgili Sayfalar) eksiksiz uygulandı.
+  - `github-release-updater.md` atomik bileşen dokümantasyonu oluşturuldu:
+    - `src/version.py`, `src/updater.py`, `src/updater_gui.py` mimari katmanları, iş parçacıkları (`UpdateCheckWorker`, `UpdateDownloadWorker`), arayüz diyalogları (`UpdateNotificationDialog`, `UpdateDownloadDialog`), dairesel bağımlılık izolasyonu ve `packaging/kast.spec` `hiddenimports` yapılandırması açıklandı.
+  - Fihrist (`index.md`) güncellenerek ADR-008 ve `github-release-updater` MOC grafına bağlandı.
+- **Etkilenen Sayfalar:** [[adr-008-in-app-github-release-updater]], [[github-release-updater]], [[index]], [[log]]
+
+---
+
+## [2026-09-26] fix | GUI Sağ Marjin Asimetrisi Düzeltimi ve Vektörel Güncelleme İkonu
+- **Ajan Rolü:** UI/UX ve Grafik Tasarım Ajanı
+- **Yapılan İşlem:**
+  - `src/gui.py` içerisinde:
+    - Başlık (`title_vbox`), alt başlık ve butonların aynı satırda 840px minimum genişlik oluşturması ve `QScrollArea`'nın yatay kaydırma çubuğu açarak sağ 20px marjini viewport dışına itmesi problemi çözüldü.
+    - Başlık ve sağ aksiyonlar (`btn_check_updates`, `lbl_badge`) `top_row` içinde toplanarak minimum genişlik 699px seviyesine çekildi; `lbl_subtitle` bağımsız alt satıra alındı (`wordWrap=True`).
+    - `scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)` yapılarak istenmeyen yatay kaydırma tamamen engellendi; sol ve sağ kenarlarda simetrik 20px marjin sağlandı.
+    - Sistem fontlarında eksik olan/görünmeyen `🔄` (U+1F504) emojisi yerine, `create_refresh_icon` fonksiyonu ile `QPainter` antialiased vektörel camgöbeği (`#38bdf8`) dairesel ok ikonu çizildi ve `QPushButton.setIcon` ile atandı.
+  - `docs/kast-app-wiki/interfaces-and-runtime/qt6-desktop-gui.md` güncellendi.
+  - Tüm testler (204 adet) %100 yeşil doğrulandı.
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
+
+---
+
+## [2026-09-26] feat | GUI Genel Buton Taktil Geri Bildirimi ve Mikromekanik Basma Efekti (Tactile Feedback)
+- **Ajan Rolü:** UI/UX ve Etkileşim Tasarımı Ajanı
+- **Yapılan İşlem:**
+  - `src/gui.py` ve `src/updater_gui.py` içerisindeki tüm `QPushButton` öğeleri için `:hover` ve `:pressed` pseudo-state'leri mikromekanik baskı efektiyle zenginleştirildi:
+    - **İç Çökme Hissi (Micro-Displacement):** Butona tıklandığı anda (`:pressed`) `padding-top` 2px artırılıp `padding-bottom` 2px azaltılarak buton içi metin ve ikonların 2px aşağı çökmesi sağlandı; dış kutu sabit tutularak layout sıçramaları önlendi.
+    - **Derinlik ve Renk Tepkisi:**
+      - Birincil aksiyon butonu (`#btn-primary` - Kast Tablosunu Çıkar, Güncelle): Hover durumunda `#38bdf8`, basılma anında tok `#0284c7` rengine ve `#0369a1` çerçeveye geçiş sağlandı.
+      - İkincil butonlar (`#btn-clear`, `#btn-action-secondary`, `btn_browse`, `btn_web`, `btn_later`): Hover durumunda `#38bdf8` çerçeve, basılma anında içe gömülü derin arka plan (`#0a0f1d`) ve camgöbeği metin rengi sağlandı.
+      - Tehlikeli butonlar (`btn_remove`, `btn_cancel`): Hover durumunda `#fb7185` / `#f43f5e`, basılma anında koyu yakut tonuna (`#be123c`) bürünme sağlandı.
+      - Üst panel güncelleme butonu (`#btn-check-updates`): Hover `#162a45`, basılma anında `#09121f` ve `#0284c7` çerçeve eklendi.
+    - **İmleç Geri Bildirimi:** Tüm butonlara (`btn_extract`, `btn_clear`, `btn_browse`, `btn_remove`, `btn_check_updates`, `btn_open_folder`, `btn_open_file`, `btn_web`, `btn_later`, `btn_update`, `btn_cancel`) programatik olarak `setCursor(Qt.PointingHandCursor)` uygulandı.
+  - Offscreen Qt render testleriyle (`.superpowers/btn_extract_pressed.png`, `.superpowers/btn_clear_pressed.png`, `.superpowers/btn_browse_pressed.png`) basma ve bırakma durumları görsel olarak doğrulandı.
+  - 204 unit ve regresyon testinin tamamı başarıyla geçti.
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
+
+---
+
+## [2026-09-26] fix | Dikey Kaydırma Çubuğunu Kaldırmak İçin Pencere Yüksekliğinin Uzatılması (860x880)
+- **Ajan Rolü:** UI/UX ve Grafik Tasarım Ajanı
+- **Yapılan İşlem:**
+  - `src/gui.py` içerisinde `KastStudioWindow.resize(860, 740)` olan varsayılan pencere geometrisi `self.resize(860, 880)` olarak güncellendi.
+  - Merkezi bileşenlerin toplam dikey boyut gereksinimi (`759px` normal, `829px` sonuç rozeti açıkken) `880px` pencere yüksekliği ile tamamen karşılanarak sağ taraftaki dikey kaydırma çubuğunun (`QScrollBar:vertical`) tetiklenmesi önlendi (`maximum: 0`, `isVisible: False`).
+  - Görsel offscreen yakalama testleri (`.superpowers/gui_880.png`, `.superpowers/gui_880_result.png`) ile hem boşta hem de işlem tamamlandığında kaydırma çubuğunun tamamen gizli kaldığı ve kenar marjinlerinin korunduğu doğrulandı.
+- **Etkilenen Sayfalar:** [[qt6-desktop-gui]], [[log]]
 
 

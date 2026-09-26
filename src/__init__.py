@@ -1,11 +1,13 @@
 """Kast dubbing cast extractor package."""
 
+from src.version import __version__
 from src.models import CastExtractionResult, CharacterStats, DialogueLine
 from src.parser import DubbingDocxParser, ParsedParagraph, KNOWN_METADATA_KEYS
 from src.paginator import PurePythonLayoutPaginator, DocumentPaginator, Paginator
 from src.table_writer import CastTableWriter, append_cast_table, save_result
 
 __all__ = [
+    "__version__",
     "DialogueLine",
     "CharacterStats",
     "CastExtractionResult",

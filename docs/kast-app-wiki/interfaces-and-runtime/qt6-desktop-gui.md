@@ -63,6 +63,16 @@ Arayüz, seslendirme ve dublaj stüdyolarında uzun saatler çalışan kullanıc
 - **Konsol Fontu:** Log alanında sabit genişlikli `Consolas`, `Cascadia Code` veya `monospace` kullanılır.
 - **QSS Sayfası (`get_stylesheet()`):** Tüm Qt widget'ları (`QMainWindow`, `QGroupBox`, `QRadioButton`, `QPushButton`, `QProgressBar`, `QTextEdit`, `QScrollBar`) için modern köşe yuvarlama (`border-radius`), geçiş ve dolgu (padding) tanımlarını merkezi olarak enjekte eder.
 
+### Buton Taktil Geri Bildirim Mekaniği (Tactile Feedback)
+
+Kullanıcının buton etkileşimlerini fiziksel ve doyurucu bir şekilde hissedebilmesi için `:hover` ve `:pressed` durumlarına özel mikromekanik baskı efektleri tanımlanmıştır:
+1. **İç Çökme Kayması (Micro-Displacement):** Tıklama anında (`:pressed`) `padding-top` 2px artırılıp `padding-bottom` 2px azaltılır. Butonun dış kutusu sabit kalırken içindeki yazı ve ikon 2px aşağı çökerek mekanik tuş hissi verir.
+2. **Kontrast ve Renk Tepkisi:**
+   - **Birincil Buton (`#btn-primary`):** Dinlenme `#00b4d8`, hover `#38bdf8`, basılma anında tok `#0284c7` rengine ve koyu çerçeveye (`#0369a1`) geçer.
+   - **İkincil Butonlar (`#btn-clear`, `#btn-action-secondary`, `btn_browse`):** Hover durumunda `#38bdf8` çerçeve, basılma anında içe gömülü derin arka plan (`#0a0f1d`) ve elektrik camgöbeği metin rengi alır.
+   - **Tehlikeli Butonlar (`btn_remove`):** Dinlenme `#f43f5e`, hover `#fb7185`, basılma anında koyu yakut tonuna (`#be123c`) bürünür.
+3. **İmleç Geri Bildirimi:** Tüm butonlar programatik olarak `Qt.PointingHandCursor` ile donatılarak fare üzerine geldiğinde el işaretine dönüşür.
+
 ---
 
 ## 3. DropZoneWidget ve Çoklu Dosya Doğrulama Motoru
@@ -188,8 +198,13 @@ Eski tekil dosya işleme akışını ve testleri korumak için `ExtractionWorker
 
 1. **Header Bölümü:**
    - İki parçalı başlık: `lbl_title_prefix` ("Kast 2.0", `#38bdf8`, 20px, bold) ve `lbl_title_suffix` (" — Dublaj Kast Çıkarma", `#f8fafc`, 20px, bold).
-   - Alt başlık: `lbl_subtitle` ("Senaryo belgelerindeki diyalogları ve karakter listesini otomatik analiz eder.", `#64748b`, 13px).
+   - Alt başlık: `lbl_subtitle` ("Çeviri belgelerindeki diyalogları ve karakter listesini otomatik analiz eder.", `#64748b`, 13px, `wordWrap=True`).
+   - Güncelleme Kontrol Butonu: `btn_check_updates` ("Güncellemeleri Denetle", `create_refresh_icon` ile çizilen yüksek çözünürlüklü vektörel dairesel ok ikonu, `#0f1c2e` zemin, `#1e3a5f` kenarlık). Tıklandığında butonu pasife alıp `"Denetleniyor..."` durumuna geçer ve manuel kontrol başlatır.
    - Sağ üst rozet: `lbl_badge` ("● Windows Studio Edition • Qt6", background `#0f293a`, border `1px solid #084c61`, color `#38bdf8`, padding `4px 12px`, border-radius `12px`).
+   - **Duyarlı Üst Satır Düzeni (`header_vbox`):** Başlık ve sağ aksiyonlar (`btn_check_updates`, `lbl_badge`) `top_row` yatay hizasında toplanmış; açıklama alt başlığı bağımsız alt satıra alınarak başlık alanının asgari genişliği 699px seviyesine çekilmiştir. Böylece yatay kaydırma çubuğu gereksinimi tamamen ortadan kaldırılmış ve pencerenin her iki yanında simetrik 20px marjin korunmuştur.
+   - **Pencere Boyutu ve Dikey Kaydırma İzolasyonu:** Varsayılan pencere geometrisi `860x880` (minimum `740x520`) olarak ayarlanmıştır. İçerik ve dinamik sonuç kartı (`result_card`) dahil tüm görsel bileşenler bu yükseklikte dikey kaydırma gerektirmeksizin (%100 görünür ve scrollbarsız) yerleşir.
+   - **Otomatik Arka Plan Kontrolü:** Uygulama açılışından 1.5 saniye sonra `QTimer.singleShot(1500, self._auto_check_updates)` ile sessiz bir `UpdateCheckWorker` iş parçacığı başlatılır; güncelleme yoksa veya ağ hatası olursa kullanıcı rahatsız edilmez, sadece yeni sürüm varsa `UpdateNotificationDialog` açılır. Kabul edilirse `UpdateDownloadDialog` indirme ve kurulum devrini yönetir.
+   - **Manuel Kontrol:** Kullanıcı butona bastığında çalışan `_manual_check_updates` akışında ise güncel sürümdeyse veya hata oluştuğunda `QMessageBox` ile kullanıcıya açık geri bildirim sunulur.
 
 2. **Merkezi Bırakma Alanı (`DropZoneWidget`):**
    - 25 dosyaya kadar çoklu sürükle-bırak veya dosya seçici kabul eden korumalı girdi paneli.

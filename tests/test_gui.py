@@ -1135,3 +1135,87 @@ def test_kast_studio_window_multi_file_partial_error_flow(qapp, tmp_path, monkey
     assert window.btn_clear.isEnabled()
     assert "❌ İşlem Başarısız: 2/2 dosyada hata oluştu." in window.lbl_result_text.text()
     assert "2 hata" in window.lbl_status.text()
+
+
+def test_gui_update_button_and_handlers_exist(qapp):
+    """KastStudioWindow üzerinde güncelleme butonu ve kontrol metotlarının varlığını test eder."""
+    from src.gui import KastStudioWindow
+
+    win = KastStudioWindow()
+    assert hasattr(win, "btn_check_updates")
+    assert "Güncellemeleri Denetle" in win.btn_check_updates.text() or "Güncelleme" in win.btn_check_updates.text()
+    assert hasattr(win, "_auto_check_updates")
+    assert hasattr(win, "_manual_check_updates")
+    assert hasattr(win, "_handle_update_check_result")
+
+
+def test_gui_auto_update_silent_when_no_update(qapp, monkeypatch):
+    """Açılıştaki otomatik kontrolde güncelleme yoksa sessiz kalınır (diyalog açılmaz)."""
+    from src.gui import KastStudioWindow
+
+    win = KastStudioWindow()
+    opened_dialogs = []
+    monkeypatch.setattr("src.gui.UpdateNotificationDialog.exec", lambda self: opened_dialogs.append("opened"))
+
+    win._handle_update_check_result(has_update=False, release_info=None, error_msg="", is_manual=False)
+    assert len(opened_dialogs) == 0
+
+
+def test_gui_manual_update_informs_user_when_latest(qapp, monkeypatch):
+    """Manuel güncelleme sorgusunda en güncel sürümdeyse bilgi mesajı gösterilir."""
+    from src.gui import KastStudioWindow
+
+    win = KastStudioWindow()
+    info_calls = []
+    monkeypatch.setattr("PySide6.QtWidgets.QMessageBox.information", lambda parent, title, text: info_calls.append((title, text)))
+
+    win._handle_update_check_result(has_update=False, release_info=None, error_msg="", is_manual=True)
+    assert len(info_calls) == 1
+    assert "Güncel" in info_calls[0][1] or "güncel" in info_calls[0][1]
+
+
+def test_gui_manual_update_shows_warning_on_error(qapp, monkeypatch):
+    """Manuel güncellemede hata alınırsa uyarı kutusu gösterilir; otomatik kontrolde sessiz kalınır."""
+    from src.gui import KastStudioWindow
+
+    win = KastStudioWindow()
+    warn_calls = []
+    monkeypatch.setattr("PySide6.QtWidgets.QMessageBox.warning", lambda parent, title, text: warn_calls.append((title, text)))
+
+    # Otomatik kontrol - sessiz kalmalı
+    win._handle_update_check_result(has_update=False, release_info=None, error_msg="Network timeout", is_manual=False)
+    assert len(warn_calls) == 0
+
+    # Manuel kontrol - uyarı vermeli
+    win._handle_update_check_result(has_update=False, release_info=None, error_msg="Network timeout", is_manual=True)
+    assert len(warn_calls) == 1
+    assert "Network timeout" in warn_calls[0][1]
+
+
+def test_gui_update_available_flow(qapp, monkeypatch):
+    """Güncelleme mevcut olduğunda bildirim diyalogu açılır ve kabul edilirse indirme diyalogu tetiklenir."""
+    from src.gui import KastStudioWindow
+    from src.updater import ReleaseInfo
+    from PySide6.QtWidgets import QDialog
+
+    win = KastStudioWindow()
+    notif_opened = []
+    dl_opened = []
+
+    monkeypatch.setattr("src.gui.UpdateNotificationDialog.exec", lambda self: notif_opened.append("notif") or QDialog.Accepted)
+    monkeypatch.setattr("src.gui.UpdateDownloadDialog.exec", lambda self: dl_opened.append("dl") or QDialog.Accepted)
+
+    dummy_rel = ReleaseInfo(
+        tag_name="v2.1.0",
+        version="2.1.0",
+        title="Kast Studio v2.1.0",
+        body="New features",
+        html_url="https://github.com/example/release",
+        assets=[],
+        target_asset=None,
+    )
+
+    win._handle_update_check_result(has_update=True, release_info=dummy_rel, error_msg="", is_manual=False)
+    assert len(notif_opened) == 1
+    assert len(dl_opened) == 1
+
