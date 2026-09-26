@@ -436,6 +436,17 @@ Bu dosya, Andrej Karpathy'nin LLM Wiki prensiplerine uygun olarak kronolojik ve 
   - `tests/test_ci_workflow.py` test dosyasına enjeksiyon adımını denetleyen birim testi eklendi; tüm testler (204 adet) %100 yeşil doğrulandı.
 - **Etkilenen Sayfalar:** [[github-release-updater]], [[github-actions-release-workflow]], [[log]]
 
+---
+
+## [2026-09-26] docs | AGENTS.md TypeSafe AI Rolünün Doğrulama (Validation) Odaklı Netleştirilmesi
+- **Ajan Rolü:** Otonom Mimarlık ve Karar Protokolü Ajanı
+- **Yapılan İşlem:**
+  - `AGENTS.md` 5. Bölümü yeniden kalibre edildi:
+    - TypeSafe AI'ın nihai karar alıcı veya her rutin adımda uygulanacak bir bürokratik darboğaz olmadığı netleştirildi.
+    - Nihai mühendislik kararının ve kod sorumluluğunun ajanda olduğu; TypeSafe AI primitiflerinin (`Choice`, `Score`, `Noul`) özellikle belirsizlik, yüksek regresyon riski veya ikinci bir bağımsız çapraz kontrol (sanity check / validation) istendiği kritik kavşaklarda devreye sokulması ilkesi pekiştirildi.
+- **Etkilenen Sayfalar:** `AGENTS.md`, [[log]]
+
+
 
 
 

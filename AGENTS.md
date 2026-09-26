@@ -75,9 +75,11 @@ Periyodik olarak ajanlar şu kontrolleri yapmalıdır:
 
 ## 5. Geliştirici Ajanın TypeSafe AI (System One) Karar ve Doğrulama Protokolü
 
-`/typesafe-ai` skill'i, Kast masaüstü uygulamasının içine gömülü çalışan bir runtime kodu **değildir**. Kod tabanında görev alan **yapay zeka ajanının (AI Coding Agent / Antigravity)**; mimari kararlarında, alternatif seçimlerinde, risk değerlendirmelerinde, kod incelemelerinde ve wiki sağlığı denetimlerinde nesnel, tip güvenli ve kalibre edilmiş kararlar almasını sağlayan bir **mühendislik karar destek primitifidir**.
+`/typesafe-ai` skill'i, Kast masaüstü uygulamasının içine gömülü çalışan bir runtime kodu **değildir**. Kod tabanında görev alan **yapay zeka ajanının (AI Coding Agent / Antigravity)**; mimari kararlarında, alternatif seçimlerinde, risk değerlendirmelerinde, kod incelemelerinde ve wiki sağlığı denetimlerinde nesnel, tip güvenli ve kalibre edilmiş kararlar almasını sağlayan bir **mühendislik karar destek ve doğrulama primitifidir**.
 
-Ajanlar, karmaşık veya belirsiz durumlarda serbest metinli sübjektif varsayımlarda bulunmak yerine `/typesafe-ai` skill'ini ve System One primitiflerini (`Choice`, `Score`, `Noul`) şu senaryolarda doğrudan devreye sokmalıdır:
+**Önemli İlke (Nihai Karar Alıcı Değildir):** TypeSafe AI kesin ve nihai bir karar verici veya her adımda çalıştırılması gereken bir bürokratik yük değildir. Nihai mühendislik kararı, kod kalitesi ve test doğrulaması ajana aittir. Bu araç; özellikle belirsizlik yaşanan, birden fazla alternatifin tartıldığı, yüksek regresyon riski taşıyan veya bağımsız bir çapraz doğrulama (sanity check) istendiği anlarda devreye sokulmalıdır. Rutin ve belirgin adımlarda gereksiz çağrılardan kaçınılmalıdır.
+
+Ajanlar, karmaşık veya belirsiz durumlarda serbest metinli sübjektif varsayımlarda bulunmak yerine `/typesafe-ai` skill'ini ve System One primitiflerini (`Choice`, `Score`, `Noul`) şu senaryolarda doğrulama amacıyla devreye sokabilir:
 
 1. **Mimari Alternatif ve Tasarım Seçimi (ADR & Planning):**
    - Bir özellik veya refactor için 2 veya daha fazla teknik yaklaşım (örn. process isolation vs threading, kuyruk stratejileri, veri modelleri) değerlendirilirken, ajanın seçimini nesnel kriterlerle doğrulaması için `Choice` primitifi kullanılır.
